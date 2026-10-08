@@ -1,8 +1,7 @@
 import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { openApply } from "@/lib/events/open-apply";
 import { removePharmaLogin, reloadPharma, storePharmaLogin, createPharmaCompany, editPharmaCompany, removePharmaCompany } from "@/lib/pharma/board.functions";
-import { PHARMA_KIND_LABEL, type PharmaBoard, type PharmaEvent } from "@/lib/pharma/types";
+import { PHARMA_KIND_LABEL, type PharmaBoard, type PharmaBrowserLogin, type PharmaEvent } from "@/lib/pharma/types";
 
 export function PharmaScreen({
   initial,
@@ -124,15 +123,19 @@ export function PharmaScreen({
   }
 
   async function saveLogin() {
-    if (company === "all") return;
+    if (company === "all" || !selected) return;
+    const loginUrl = selected.loginUrl;
+    const tab = window.open("about:blank", "_blank");
     setSaving(true);
     setError("");
     try {
       const next = await storePharmaLogin({ data: { companyId: company, username, password } });
-      setBoard(next);
+      setBoard(next.board);
+      openMall(tab, next.login, username, password, loginUrl);
       setPassword("");
-      setUsername(next.companies.find((item) => item.id === company)?.username ?? username);
+      setUsername(next.board.companies.find((item) => item.id === company)?.username ?? username);
     } catch (err) {
+      openMall(tab, null, username, password, loginUrl);
       setError(err instanceof Error ? err.message : "저장하지 못했습니다.");
     } finally {
       setSaving(false);
@@ -258,6 +261,7 @@ export function PharmaScreen({
       )}
 
       {company !== "all" ? (
+        <>
         <form
           className="mt-2 flex flex-wrap items-center gap-1.5"
           onSubmit={(event) => {
@@ -285,7 +289,7 @@ export function PharmaScreen({
             disabled={saving}
             className="inline-flex h-8 shrink-0 items-center rounded-full bg-ink px-3 text-xs font-medium text-paper disabled:opacity-60"
           >
-            {saving ? "확인 중" : "저장"}
+            {saving ? "확인 중" : "로그인"}
           </button>
           {selected?.saved ? (
             <button
@@ -298,8 +302,12 @@ export function PharmaScreen({
             </button>
           ) : null}
         </form>
+        <p className="mt-1 text-xs text-muted">
+          {selected?.message || "로그인하면 그 몰이 새 창으로 열리고, 아이디는 다음 수집에도 쓰입니다."}
+        </p>
+        </>
       ) : (
-        <p className="mt-2 text-xs text-muted">회사를 고르고 아이디를 저장하세요. 저장된 곳만, 한 번에 4곳씩 읽습니다.</p>
+        <p className="mt-2 text-xs text-muted">회사를 고르고 아이디를 넣은 뒤 로그인하세요.</p>
       )}
 
       <p className="mt-2 text-xs text-muted">{visible.length}건</p>
@@ -342,10 +350,8 @@ export function PharmaScreen({
                 </div>
                 <a
                   href={item.loginUrl}
-                  onClick={(click) => {
-                    click.preventDefault();
-                    openApply(item.loginUrl);
-                  }}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex h-7 shrink-0 items-center gap-0.5 text-xs font-medium text-accent"
                 >
                   바로가기
@@ -384,10 +390,8 @@ function PharmaRow({
           <span className="text-[11px] tabular-nums text-muted">{event.endDate ? `~${event.endDate.slice(5)}` : "기간 확인"}</span>
           <a
             href={event.url}
-            onClick={(click) => {
-              click.preventDefault();
-              openApply(event.url);
-            }}
+            target="_blank"
+            rel="noopener noreferrer"
             className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
             {label}
@@ -415,10 +419,8 @@ function PharmaRow({
           </button>
           <a
             href={event.url}
-            onClick={(click) => {
-              click.preventDefault();
-              openApply(event.url);
-            }}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
             {label}
@@ -450,10 +452,8 @@ function PharmaBody({ event, companyFull }: { event: PharmaEvent; companyFull: s
       </ul>
       <a
         href={event.url}
-        onClick={(click) => {
-          click.preventDefault();
-          openApply(event.url);
-        }}
+        target="_blank"
+        rel="noopener noreferrer"
         className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
       >
         {companyFull}에서 보기
@@ -461,6 +461,41 @@ function PharmaBody({ event, companyFull }: { event: PharmaEvent; companyFull: s
       </a>
     </div>
   );
+}
+
+function openMall(
+  tab: Window | null,
+  login: PharmaBrowserLogin | null,
+  username: string,
+  password: string,
+  fallback: string,
+) {
+  const destination = /^https?:/i.test(fallback) ? fallback : "about:blank";
+  if (login && tab) {
+    const doc = tab.document;
+    const form = doc.createElement("form");
+    form.method = login.method;
+    form.action = login.action;
+    form.acceptCharset = login.charset;
+    const fields = new Map(login.fields.map((field) => [field.name, field.value]));
+    fields.set(login.userField, username);
+    fields.set(login.passField, password);
+    for (const [name, value] of fields) {
+      const input = doc.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+    doc.body.appendChild(form);
+    form.submit();
+    return;
+  }
+  if (tab) {
+    tab.location.replace(destination);
+    return;
+  }
+  window.location.assign(destination);
 }
 
 function SortButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {

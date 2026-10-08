@@ -103,7 +103,7 @@ var HEADERS = { TSS_SHELL: "X-TSS_SHELL" };
 * the dev styles URL for route-scoped CSS collection.
 */
 async function getStartManifest(matchedRoutes) {
-	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-q0Vz8y4H.mjs");
+	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-i-lMQVzS.mjs");
 	const startManifest = tsrStartManifest();
 	let routes = startManifest.routes;
 	routes[rootRouteId];
@@ -125,11 +125,11 @@ async function getStartManifest(matchedRoutes) {
 var manifest = {
 	"1aaab22452eef24edbc300560980af93ec4b7b7a683758d66a4f42c01107fa6a": {
 		functionName: "removePharmaLogin_createServerFn_handler",
-		importer: () => import("./board.functions-CJZjID-k.mjs")
+		importer: () => import("./board.functions-ssu1ZWVN.mjs")
 	},
 	"81384d28ddaa14716f0e0713e938a43bf7dc53d179fb28c7c6ee2c527fa36333": {
 		functionName: "reloadPharma_createServerFn_handler",
-		importer: () => import("./board.functions-CJZjID-k.mjs")
+		importer: () => import("./board.functions-ssu1ZWVN.mjs")
 	},
 	"8c14451dae457ac2e171179defe6369842c145c577862973196c2960056b5a59": {
 		functionName: "getBoard_createServerFn_handler",
@@ -137,7 +137,7 @@ var manifest = {
 	},
 	"b9abab0d616af06cc73f7f660d68ac8cf86ab98cb55e3578b9840f3c2eab6398": {
 		functionName: "storePharmaLogin_createServerFn_handler",
-		importer: () => import("./board.functions-CJZjID-k.mjs")
+		importer: () => import("./board.functions-ssu1ZWVN.mjs")
 	},
 	"c20b50b61dfab16855048e96c1dbd7dab49bfa123c16e3c0754efa0768c00509": {
 		functionName: "reloadBoard_createServerFn_handler",
@@ -145,19 +145,19 @@ var manifest = {
 	},
 	"d9b8dddb359c15f8c53d67878b580806f69853d4a2ccd860aaa047e0f5f11613": {
 		functionName: "getPharmaBoard_createServerFn_handler",
-		importer: () => import("./board.functions-CJZjID-k.mjs")
+		importer: () => import("./board.functions-ssu1ZWVN.mjs")
 	},
 	"e5e017d455614273379fd1fb209a7a34ef1a3254cd54f5c8c92e6a9f8cffe45e": {
 		functionName: "removePharmaCompany_createServerFn_handler",
-		importer: () => import("./board.functions-CJZjID-k.mjs")
+		importer: () => import("./board.functions-ssu1ZWVN.mjs")
 	},
 	"f08e9530d5135c704625b20f8aa980371004573ac6c6eb2a50c4c5efa07e4472": {
 		functionName: "editPharmaCompany_createServerFn_handler",
-		importer: () => import("./board.functions-CJZjID-k.mjs")
+		importer: () => import("./board.functions-ssu1ZWVN.mjs")
 	},
 	"fe6856b22266cbb8e418214854d8e1e8378b48c8ffc9cb9db65bdf8e65612eed": {
 		functionName: "createPharmaCompany_createServerFn_handler",
-		importer: () => import("./board.functions-CJZjID-k.mjs")
+		importer: () => import("./board.functions-ssu1ZWVN.mjs")
 	}
 };
 async function getServerFnById(id, access) {
@@ -1562,7 +1562,7 @@ var getBaseManifest = getProdBaseManifest;
 var createEarlyHintsForRequest = createEarlyHintsCollector;
 async function loadEntries() {
 	const [routerEntry, startEntry, pluginAdapters] = await Promise.all([
-		import("./router-CIHqb1Xr.mjs").then((n) => n.t),
+		import("./router-Ba0xhKNa.mjs").then((n) => n.t),
 		import("./start-5Z2QO8AU.mjs"),
 		import("./empty-plugin-adapters-D9UWiqvJ.mjs")
 	]);

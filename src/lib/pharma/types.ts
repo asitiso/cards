@@ -31,6 +31,15 @@ export type PharmaBoard = {
   companies: PharmaCompanyReport[];
 };
 
+export type PharmaBrowserLogin = {
+  action: string;
+  method: "get" | "post";
+  charset: string;
+  userField: string;
+  passField: string;
+  fields: { name: string; value: string }[];
+};
+
 export const PHARMA_KIND_LABEL: Record<PharmaKind, string> = {
   entry: "응모",
   sale: "할인",

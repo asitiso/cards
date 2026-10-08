@@ -2,8 +2,8 @@ import { o as __toESM } from "../_runtime.mjs";
 import { b as require_jsx_runtime, q as require_react } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as MARKETS, r as issuerMeta, t as ISSUERS } from "./store.server-qWZeByN8.mjs";
 import { a as ArrowUpRight, i as ChevronDown, n as Search, r as RefreshCw } from "../_libs/lucide-react.mjs";
-import { a as reloadPharma, c as storePharmaLogin, i as editPharmaCompany, l as reloadBoard, n as Route$1, o as removePharmaCompany, r as createPharmaCompany, s as removePharmaLogin } from "./router-CIHqb1Xr.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-DU-4HSvQ.js
+import { a as reloadPharma, c as storePharmaLogin, i as editPharmaCompany, l as reloadBoard, n as Route$1, o as removePharmaCompany, r as createPharmaCompany, s as removePharmaLogin } from "./router-Ba0xhKNa.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-D_QzNnf-.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 /**
@@ -164,7 +164,9 @@ function PharmaScreen({ initial, onFinance }) {
 		}
 	}
 	async function saveLogin() {
-		if (company === "all") return;
+		if (company === "all" || !selected) return;
+		const loginUrl = selected.loginUrl;
+		const tab = window.open("about:blank", "_blank");
 		setSaving(true);
 		setError("");
 		try {
@@ -173,10 +175,12 @@ function PharmaScreen({ initial, onFinance }) {
 				username,
 				password
 			} });
-			setBoard(next);
+			setBoard(next.board);
+			openMall(tab, next.login, username, password, loginUrl);
 			setPassword("");
-			setUsername(next.companies.find((item) => item.id === company)?.username ?? username);
+			setUsername(next.board.companies.find((item) => item.id === company)?.username ?? username);
 		} catch (err) {
+			openMall(tab, null, username, password, loginUrl);
 			setError(err instanceof Error ? err.message : "저장하지 못했습니다.");
 		} finally {
 			setSaving(false);
@@ -314,7 +318,7 @@ function PharmaScreen({ initial, onFinance }) {
 				className: "mt-2 text-xs text-muted",
 				children: "회사를 고르면 이름·주소·로그인을 바꿀 수 있습니다."
 			}),
-			company !== "all" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+			company !== "all" ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
 				className: "mt-2 flex flex-wrap items-center gap-1.5",
 				onSubmit: (event) => {
 					event.preventDefault();
@@ -340,7 +344,7 @@ function PharmaScreen({ initial, onFinance }) {
 						type: "submit",
 						disabled: saving,
 						className: "inline-flex h-8 shrink-0 items-center rounded-full bg-ink px-3 text-xs font-medium text-paper disabled:opacity-60",
-						children: saving ? "확인 중" : "저장"
+						children: saving ? "확인 중" : "로그인"
 					}),
 					selected?.saved ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 						type: "button",
@@ -350,9 +354,12 @@ function PharmaScreen({ initial, onFinance }) {
 						children: "로그인 삭제"
 					}) : null
 				]
-			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-1 text-xs text-muted",
+				children: selected?.message || "로그인하면 그 몰이 새 창으로 열리고, 아이디는 다음 수집에도 쓰입니다."
+			})] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 				className: "mt-2 text-xs text-muted",
-				children: "회사를 고르고 아이디를 저장하세요. 저장된 곳만, 한 번에 4곳씩 읽습니다."
+				children: "회사를 고르고 아이디를 넣은 뒤 로그인하세요."
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
 				className: "mt-2 text-xs text-muted",
@@ -395,10 +402,8 @@ function PharmaScreen({ initial, onFinance }) {
 							})]
 						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
 							href: item.loginUrl,
-							onClick: (click) => {
-								click.preventDefault();
-								openApply(item.loginUrl);
-							},
+							target: "_blank",
+							rel: "noopener noreferrer",
 							className: "inline-flex h-7 shrink-0 items-center gap-0.5 text-xs font-medium text-accent",
 							children: ["바로가기", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3.5" })]
 						})]
@@ -432,10 +437,8 @@ function PharmaRow({ event, companyLabel, companyFull, today, open, onToggle }) 
 						}),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
 							href: event.url,
-							onClick: (click) => {
-								click.preventDefault();
-								openApply(event.url);
-							},
+							target: "_blank",
+							rel: "noopener noreferrer",
 							className: "ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink",
 							children: [label, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
 						})
@@ -484,10 +487,8 @@ function PharmaRow({ event, companyLabel, companyFull, today, open, onToggle }) 
 					]
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
 					href: event.url,
-					onClick: (click) => {
-						click.preventDefault();
-						openApply(event.url);
-					},
+					target: "_blank",
+					rel: "noopener noreferrer",
 					className: "mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink",
 					children: [label, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
 				})]
@@ -524,10 +525,8 @@ function PharmaBody({ event, companyFull }) {
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
 				href: event.url,
-				onClick: (click) => {
-					click.preventDefault();
-					openApply(event.url);
-				},
+				target: "_blank",
+				rel: "noopener noreferrer",
 				className: "mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto",
 				children: [
 					companyFull,
@@ -537,6 +536,34 @@ function PharmaBody({ event, companyFull }) {
 			})
 		]
 	});
+}
+function openMall(tab, login, username, password, fallback) {
+	const destination = /^https?:/i.test(fallback) ? fallback : "about:blank";
+	if (login && tab) {
+		const doc = tab.document;
+		const form = doc.createElement("form");
+		form.method = login.method;
+		form.action = login.action;
+		form.acceptCharset = login.charset;
+		const fields = new Map(login.fields.map((field) => [field.name, field.value]));
+		fields.set(login.userField, username);
+		fields.set(login.passField, password);
+		for (const [name, value] of fields) {
+			const input = doc.createElement("input");
+			input.type = "hidden";
+			input.name = name;
+			input.value = value;
+			form.appendChild(input);
+		}
+		doc.body.appendChild(form);
+		form.submit();
+		return;
+	}
+	if (tab) {
+		tab.location.replace(destination);
+		return;
+	}
+	window.location.assign(destination);
 }
 function SortButton$1({ active, onClick, children }) {
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {

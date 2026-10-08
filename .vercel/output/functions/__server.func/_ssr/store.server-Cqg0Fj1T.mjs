@@ -1,6 +1,6 @@
 import { a as mapPool, i as isOngoing, l as stripTags, n as getSql, o as parseRange, s as seoulToday, u as visibleMarkup } from "./html-BxjaJV6T.mjs";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-//#region node_modules/.nitro/vite/services/ssr/assets/store.server-RFviKh6B.js
+//#region node_modules/.nitro/vite/services/ssr/assets/store.server-Cqg0Fj1T.js
 /** Bookmark list without the wholesale folder. 바로팜만 남겼다. */
 var SEED_COMPANIES = [
 	{
@@ -315,11 +315,13 @@ function findLoginForm(html, pageUrl) {
 		} catch {
 			action = pageUrl;
 		}
+		const methodAttr = attr(match[1], "method").toLowerCase();
 		const form = {
 			action,
-			fields: inputs.filter((input) => input.name),
+			fields: inputs.filter((input) => input.name && input.type !== "checkbox" && input.type !== "radio"),
 			userField: user.name,
-			passField: pass.name
+			passField: pass.name,
+			method: methodAttr === "get" ? "get" : "post"
 		};
 		const score = (/login|signin|member/i.test(action) ? 2 : 0) + (user ? 1 : 0);
 		if (score > bestScore) {
@@ -367,6 +369,30 @@ function extractOffers(html, pageUrl, companyId, today) {
 		if (found.length >= 12) break;
 	}
 	return found;
+}
+async function describeLogin(loginUrl) {
+	const jar = /* @__PURE__ */ new Map();
+	let page = await request(loginUrl, jar);
+	let form = findLoginForm(page.html, page.url);
+	if (!form) {
+		const link = loginLink(page.html, page.url);
+		if (link) {
+			page = await request(link, jar);
+			form = findLoginForm(page.html, page.url);
+		}
+	}
+	if (!form) return null;
+	return {
+		action: form.action,
+		method: form.method,
+		charset: pageCharset(page.html),
+		userField: form.userField,
+		passField: form.passField,
+		fields: form.fields.filter((field) => field.type === "hidden" || field.type === "text" || field.name === form.userField || field.name === form.passField).map((field) => ({
+			name: field.name,
+			value: field.name === form.passField ? "" : field.value
+		}))
+	};
 }
 async function collectCompany(company, username, password, today) {
 	const jar = /* @__PURE__ */ new Map();
@@ -436,6 +462,10 @@ async function collectCompany(company, username, password, today) {
 			events: []
 		};
 	}
+}
+function pageCharset(html) {
+	const value = (/charset\s*=\s*["']?\s*([a-z0-9_-]+)/i.exec(html.slice(0, 2e3))?.[1] ?? "utf-8").toLowerCase();
+	return value.includes("euc") || value.includes("ks_c") ? "euc-kr" : "utf-8";
 }
 function loginLink(html, pageUrl) {
 	for (const match of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
@@ -796,8 +826,12 @@ async function savePharmaLogin(companyId, username, password) {
       password_enc = excluded.password_enc,
       updated_at = now()
   `;
+	const loginPromise = describeLogin(company.loginUrl).catch(() => null);
 	await saveReport(await runCompanies([company]), null);
-	return loadPharmaBoard();
+	return {
+		board: await loadPharmaBoard(),
+		login: await loginPromise
+	};
 }
 async function clearPharmaLogin(companyId) {
 	if (!await getCompany(companyId)) throw new Error("없는 회사입니다.");

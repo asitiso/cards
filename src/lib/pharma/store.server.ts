@@ -1,9 +1,9 @@
 import { getSql } from "@/lib/db";
 import { mapPool, seoulToday } from "@/lib/events/html";
 import { SEED_COMPANIES, chipLabel, type PharmaCompany } from "./companies.ts";
-import { collectCompany } from "./collect.ts";
+import { collectCompany, describeLogin } from "./collect.ts";
 import { decryptText, encryptText, newPharmaKey } from "./secret.ts";
-import type { PharmaBoard, PharmaCompanyReport, PharmaEvent, PharmaKind } from "./types.ts";
+import type { PharmaBoard, PharmaBrowserLogin, PharmaCompanyReport, PharmaEvent, PharmaKind } from "./types.ts";
 
 const BATCH = 4;
 
@@ -284,7 +284,11 @@ export async function refreshPharma(companyId?: string): Promise<PharmaBoard> {
   return loadPharmaBoard();
 }
 
-export async function savePharmaLogin(companyId: string, username: string, password: string): Promise<PharmaBoard> {
+export async function savePharmaLogin(
+  companyId: string,
+  username: string,
+  password: string,
+): Promise<{ board: PharmaBoard; login: PharmaBrowserLogin | null }> {
   const company = await getCompany(companyId);
   if (!company) throw new Error("없는 회사입니다.");
   const name = username.trim();
@@ -305,9 +309,10 @@ export async function savePharmaLogin(companyId: string, username: string, passw
       password_enc = excluded.password_enc,
       updated_at = now()
   `;
+  const loginPromise = describeLogin(company.loginUrl).catch(() => null);
   const updates = await runCompanies([company]);
   await saveReport(updates, null);
-  return loadPharmaBoard();
+  return { board: await loadPharmaBoard(), login: await loginPromise };
 }
 
 export async function clearPharmaLogin(companyId: string): Promise<PharmaBoard> {

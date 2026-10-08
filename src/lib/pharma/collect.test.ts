@@ -21,6 +21,7 @@ test("login form picks the password form", () => {
   assert.equal(form?.userField, "userId");
   assert.equal(form?.passField, "userPw");
   assert.equal(form?.action, "https://mall.example/member/login");
+  assert.equal(form?.method, "post");
 });
 
 test("extracts dated offers and skips ended ones", () => {

@@ -1,6 +1,6 @@
 import { isOngoing, parseRange, stripTags, visibleMarkup } from "../events/html.ts";
 import type { PharmaCompany } from "./companies.ts";
-import type { PharmaEvent, PharmaKind } from "./types.ts";
+import type { PharmaBrowserLogin, PharmaEvent, PharmaKind } from "./types.ts";
 
 const SKIP = /로그인|로그아웃|회원가입|아이디찾기|비밀번호|장바구니|마이페이지|고객센터|이용약관|개인정보|회사소개/;
 const FAIL = /비밀번호가\s*(틀|다릅|일치하지)|로그인에 실패|로그인 실패|아이디 또는 비밀번호|없는 회원|인증에 실패|회원이 아닙니다/;
@@ -11,6 +11,7 @@ export type LoginForm = {
   fields: LoginField[];
   userField: string;
   passField: string;
+  method: "get" | "post";
 };
 
 export type CollectResult = {
@@ -61,11 +62,13 @@ export function findLoginForm(html: string, pageUrl: string): LoginForm | null {
     } catch {
       action = pageUrl;
     }
+    const methodAttr = attr(match[1], "method").toLowerCase();
     const form: LoginForm = {
       action,
-      fields: inputs.filter((input) => input.name),
+      fields: inputs.filter((input) => input.name && input.type !== "checkbox" && input.type !== "radio"),
       userField: user.name,
       passField: pass.name,
+      method: methodAttr === "get" ? "get" : "post",
     };
     const score = (/login|signin|member/i.test(action) ? 2 : 0) + (user ? 1 : 0);
     if (score > bestScore) {
@@ -120,6 +123,30 @@ export function extractOffers(html: string, pageUrl: string, companyId: string, 
     if (found.length >= 12) break;
   }
   return found;
+}
+
+export async function describeLogin(loginUrl: string): Promise<PharmaBrowserLogin | null> {
+  const jar = new Map<string, string>();
+  let page = await request(loginUrl, jar);
+  let form = findLoginForm(page.html, page.url);
+  if (!form) {
+    const link = loginLink(page.html, page.url);
+    if (link) {
+      page = await request(link, jar);
+      form = findLoginForm(page.html, page.url);
+    }
+  }
+  if (!form) return null;
+  return {
+    action: form.action,
+    method: form.method,
+    charset: pageCharset(page.html),
+    userField: form.userField,
+    passField: form.passField,
+    fields: form.fields
+      .filter((field) => field.type === "hidden" || field.type === "text" || field.name === form.userField || field.name === form.passField)
+      .map((field) => ({ name: field.name, value: field.name === form.passField ? "" : field.value })),
+  };
 }
 
 export async function collectCompany(
@@ -183,6 +210,12 @@ export async function collectCompany(
       events: [],
     };
   }
+}
+
+function pageCharset(html: string): string {
+  const match = /charset\s*=\s*["']?\s*([a-z0-9_-]+)/i.exec(html.slice(0, 2000));
+  const value = (match?.[1] ?? "utf-8").toLowerCase();
+  return value.includes("euc") || value.includes("ks_c") ? "euc-kr" : "utf-8";
 }
 
 function loginLink(html: string, pageUrl: string): string | null {
