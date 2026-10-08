@@ -2,6 +2,7 @@ import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { removePharmaLogin, reloadPharma, storePharmaLogin, createPharmaCompany, editPharmaCompany, removePharmaCompany } from "@/lib/pharma/board.functions";
 import { PHARMA_KIND_LABEL, type PharmaBoard, type PharmaBrowserLogin, type PharmaEvent } from "@/lib/pharma/types";
+import { ChangeHistory } from "@/components/change-history";
 
 export function PharmaScreen({
   initial,
@@ -183,6 +184,11 @@ export function PharmaScreen({
       </header>
 
       {error ? <p className="mt-2 text-sm text-accent">{error}</p> : null}
+
+      <ChangeHistory
+        changes={board.changes}
+        sourceName={(id) => board.companies.find((item) => item.id === id)?.name ?? id}
+      />
 
       <div className="mt-3 flex items-center gap-1.5">
         <label className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-full border border-line bg-card px-3">
