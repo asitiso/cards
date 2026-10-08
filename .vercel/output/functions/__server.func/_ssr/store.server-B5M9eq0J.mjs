@@ -1,14 +1,4 @@
-import { n as TSS_SERVER_FUNCTION, t as createServerFn } from "./ssr.mjs";
-import { n as issuerMeta, t as ISSUERS } from "./types-CQCDGUHx.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/board.functions-BlQQ7ftv.js
-var createServerRpc = (serverFnMeta, splitImportFn) => {
-	const url = "/_serverFn/" + serverFnMeta.id;
-	return Object.assign(splitImportFn, {
-		url,
-		serverFnMeta,
-		[TSS_SERVER_FUNCTION]: true
-	});
-};
+//#region node_modules/.nitro/vite/services/ssr/assets/store.server-B5M9eq0J.js
 var _0002_events_default = "create table if not exists entry_events (\n  id text primary key,\n  issuer text not null,\n  title text not null,\n  summary text not null,\n  benefit text not null,\n  conditions text not null,\n  exclusions text not null,\n  start_date date,\n  end_date date,\n  apply_url text not null,\n  list_url text not null,\n  active boolean not null default true,\n  collected_at timestamptz not null default now()\n);\n\ncreate index if not exists entry_events_issuer_idx on entry_events (issuer);\ncreate index if not exists entry_events_end_idx on entry_events (end_date);\n\ncreate table if not exists collect_state (\n  id integer primary key,\n  collected_at timestamptz not null,\n  report text not null\n);\n";
 /**
 * Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`
@@ -276,6 +266,672 @@ async function mapPool(items, size, task) {
 	}
 	await Promise.all(Array.from({ length: Math.min(size, items.length) }, () => worker()));
 	return out;
+}
+var MARKETS = [
+	{
+		id: "card",
+		label: "카드"
+	},
+	{
+		id: "securities",
+		label: "증권"
+	},
+	{
+		id: "bank",
+		label: "은행"
+	}
+];
+var ISSUERS = [
+	{
+		id: "shinhan",
+		name: "신한카드",
+		short: "신한",
+		listUrl: "https://www.shinhancard.com/mob/MOBFM829N/MOBFM829R01.shc",
+		market: "card",
+		androidPackage: "com.shcard.smartpay",
+		iosAppId: "572462317"
+	},
+	{
+		id: "samsung",
+		name: "삼성카드",
+		short: "삼성",
+		listUrl: "https://www.samsungcard.com/personal/event/ing/UHPPBE1401M0.jsp",
+		market: "card",
+		androidPackage: "net.ib.android.smcard",
+		iosAppId: "379577046"
+	},
+	{
+		id: "hyundai",
+		name: "현대카드",
+		short: "현대",
+		listUrl: "https://www.hyundaicard.com/cpb/ev/CPBEV0101_01.hc",
+		market: "card",
+		androidPackage: "com.hyundaicard.appcard",
+		iosAppId: "702653088"
+	},
+	{
+		id: "kb",
+		name: "KB국민카드",
+		short: "KB",
+		listUrl: "https://card.kbcard.com/BON/DVIEW/HBBMCXCRVNEC0001",
+		market: "card",
+		androidPackage: "com.kbcard.cxh.appcard",
+		iosAppId: "695436326"
+	},
+	{
+		id: "lotte",
+		name: "롯데카드",
+		short: "롯데",
+		listUrl: "https://m.lottecard.co.kr/app/LPBNFDA_V100.lc",
+		market: "card",
+		androidPackage: "com.lcacApp",
+		iosAppId: "688047200"
+	},
+	{
+		id: "woori",
+		name: "우리카드",
+		short: "우리",
+		listUrl: "https://m.wooricard.com/dcmw/yh1/bnf/bnf02/prgevnt/M1BNF202S00.do",
+		market: "card",
+		androidPackage: "com.wooricard.smartapp",
+		iosAppId: "1499598869"
+	},
+	{
+		id: "hana",
+		name: "하나카드",
+		short: "하나",
+		listUrl: "https://m.hanacard.co.kr/MKEVT1000M.web",
+		market: "card",
+		androidPackage: "com.hanaskcard.paycla",
+		iosAppId: "847268987"
+	},
+	{
+		id: "nh",
+		name: "NH농협카드",
+		short: "NH",
+		listUrl: "https://card.nonghyup.com/IPCC010001.menu",
+		market: "card",
+		androidPackage: "nh.smart.nhallonepay",
+		iosAppId: "1177889176"
+	},
+	{
+		id: "bc",
+		name: "BC카드",
+		short: "BC",
+		listUrl: "https://web.paybooc.co.kr/web/evnt/main",
+		market: "card",
+		androidPackage: "kvp.jjy.MispAndroid320",
+		iosAppId: "369125087"
+	},
+	{
+		id: "ibk",
+		name: "IBK기업은행",
+		short: "IBK",
+		listUrl: "https://www.ibk.co.kr/event/ingListEvent.ibk?pageId=CM01060100&evnt_dscd=H",
+		market: "card",
+		androidPackage: "com.ibk.android.ionebank",
+		iosAppId: "1460543865"
+	},
+	{
+		id: "mirae",
+		name: "미래에셋증권",
+		short: "미래",
+		listUrl: "https://securities.miraeasset.com/hki/hki7000/r05.do",
+		market: "securities",
+		androidPackage: "com.miraeasset.trade",
+		iosAppId: "1248716281"
+	},
+	{
+		id: "samsungsec",
+		name: "삼성증권",
+		short: "삼성",
+		listUrl: "https://m.samsungpop.com/mbw/customer/noticeEvent.do?cmd=eventList",
+		market: "securities",
+		androidPackage: "com.samsungpop.android.mpop",
+		iosAppId: "1150231646"
+	},
+	{
+		id: "koreainvest",
+		name: "한국투자증권",
+		short: "한투",
+		listUrl: "https://m.truefriend.com/",
+		market: "securities",
+		androidPackage: "com.truefriend.neosmartarenewal",
+		iosAppId: "1621986905"
+	},
+	{
+		id: "kbsec",
+		name: "KB증권",
+		short: "KB",
+		listUrl: "https://www.kbsec.com/go.able",
+		market: "securities",
+		androidPackage: "com.kbsec.mts.iplustarngm2",
+		iosAppId: "350742701"
+	},
+	{
+		id: "nhsec",
+		name: "NH투자증권",
+		short: "NH",
+		listUrl: "https://www.mynamuh.com/",
+		market: "securities",
+		androidPackage: "com.wooriwm.txsmart",
+		iosAppId: "486312400"
+	},
+	{
+		id: "kiwoom",
+		name: "키움증권",
+		short: "키움",
+		listUrl: "https://www.kiwoom.com/m/customer/event/VIngEventView",
+		market: "securities",
+		androidPackage: "com.kiwoom.heromts",
+		iosAppId: "1570370057"
+	},
+	{
+		id: "shinhansec",
+		name: "신한투자증권",
+		short: "신한",
+		listUrl: "https://www.shinhansec.com/siw/customer/event/eventList/view.do",
+		market: "securities",
+		androidPackage: "com.shinhaninvest.nsmts",
+		iosAppId: "1168512940"
+	},
+	{
+		id: "hanasec",
+		name: "하나증권",
+		short: "하나",
+		listUrl: "https://www.hanaw.com/corebbs5/eventIng/list/list.cmd",
+		market: "securities",
+		androidPackage: "com.hanasec.stock",
+		iosAppId: "1506702407"
+	},
+	{
+		id: "daishin",
+		name: "대신증권",
+		short: "대신",
+		listUrl: "https://m.daishin.com/",
+		market: "securities",
+		androidPackage: "com.daishin",
+		iosAppId: "414850336"
+	},
+	{
+		id: "meritz",
+		name: "메리츠증권",
+		short: "메리츠",
+		listUrl: "https://home.imeritz.com/cust/ntcevnt/PrgsEvnt.do",
+		market: "securities",
+		androidPackage: "com.imeritz.smartmeritz",
+		iosAppId: "1104272974"
+	},
+	{
+		id: "tosssec",
+		name: "토스증권",
+		short: "토스",
+		listUrl: "https://www.tossinvest.com/",
+		market: "securities",
+		androidPackage: "viva.republica.toss",
+		iosAppId: "839333328"
+	},
+	{
+		id: "kakaopaysec",
+		name: "카카오페이증권",
+		short: "카카페",
+		listUrl: "https://www.kakaopay.com/",
+		market: "securities",
+		androidPackage: "com.kakaopay.app",
+		iosAppId: "1464496236"
+	},
+	{
+		id: "kbbank",
+		name: "KB국민은행",
+		short: "KB",
+		listUrl: "https://obank.kbstar.com/",
+		market: "bank",
+		androidPackage: "com.kbstar.kbbank",
+		iosAppId: "373742138"
+	},
+	{
+		id: "shinhanbank",
+		name: "신한은행",
+		short: "신한",
+		listUrl: "https://bank.shinhan.com/",
+		market: "bank",
+		androidPackage: "com.shinhan.sbanking",
+		iosAppId: "357484932"
+	},
+	{
+		id: "wooribank",
+		name: "우리은행",
+		short: "우리",
+		listUrl: "https://spot.wooribank.com/pot/Dream?withyou=EVEVT0001",
+		market: "bank",
+		androidPackage: "com.wooribank.smart.npib",
+		iosAppId: "1470181651"
+	},
+	{
+		id: "hanabank",
+		name: "하나은행",
+		short: "하나",
+		listUrl: "https://m.kebhana.com/",
+		market: "bank",
+		androidPackage: "com.hanabank.oqf",
+		iosAppId: "6743190232"
+	},
+	{
+		id: "nhbank",
+		name: "NH농협은행",
+		short: "NH",
+		listUrl: "https://banking.nonghyup.com/",
+		market: "bank",
+		androidPackage: "com.nonghyup.nhallonebank",
+		iosAppId: "1641628055"
+	},
+	{
+		id: "ibkbank",
+		name: "IBK기업은행",
+		short: "IBK",
+		listUrl: "https://www.ibk.co.kr/event/ingListEvent.ibk?pageId=CM01060100",
+		market: "bank",
+		androidPackage: "com.ibk.android.ionebank",
+		iosAppId: "1460543865"
+	},
+	{
+		id: "kakaobank",
+		name: "카카오뱅크",
+		short: "카카오",
+		listUrl: "https://www.kakaobank.com/",
+		market: "bank",
+		androidPackage: "com.kakaobank.channel",
+		iosAppId: "1258016944"
+	},
+	{
+		id: "tossbank",
+		name: "토스뱅크",
+		short: "토스",
+		listUrl: "https://www.tossbank.com/",
+		market: "bank",
+		androidPackage: "viva.republica.toss",
+		iosAppId: "839333328"
+	},
+	{
+		id: "kbank",
+		name: "케이뱅크",
+		short: "케이",
+		listUrl: "https://www.kbanknow.com/",
+		market: "bank",
+		androidPackage: "com.kbankwith.smartbank",
+		iosAppId: "1178872627"
+	}
+];
+function issuerMeta(id) {
+	const found = ISSUERS.find((item) => item.id === id);
+	if (!found) throw new Error(`unknown issuer ${id}`);
+	return found;
+}
+var ENTRY = /응모|쿠폰|추첨|이벤트\s*신청|신청\s*필수|신청하기|참여\s*신청/;
+function eventOf(issuer, externalId, title, summary, startDate, endDate, applyUrl) {
+	const line = summary || "회사 화면에서 응모·쿠폰·추첨 조건을 확인하세요.";
+	return {
+		id: `${issuer}:${externalId}`,
+		issuer,
+		title,
+		summary: line,
+		benefit: "응모·쿠폰·추첨",
+		conditions: [line],
+		exclusions: [],
+		startDate,
+		endDate,
+		applyUrl,
+		listUrl: issuerMeta(issuer).listUrl
+	};
+}
+function dateRange(value) {
+	const nums = [];
+	for (const match of value.matchAll(/(\d{4})\s*(?:년|[.\-/])\s*(\d{1,2})\s*(?:월|[.\-/])\s*(\d{1,2})/g)) {
+		const month = Number(match[2]);
+		const day = Number(match[3]);
+		if (month < 1 || month > 12 || day < 1 || day > 31) continue;
+		nums.push(`${match[1]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+	}
+	if (nums.length < 2) return null;
+	return {
+		start: nums[0],
+		end: nums[1]
+	};
+}
+function periodRange(text) {
+	const spot = text.match(/(?:이벤트\s*)?기간\s*[:：]?\s*([\s\S]{0,90})/);
+	if (!spot) return null;
+	return dateRange(spot[1]);
+}
+function pageText(html) {
+	return stripTags(visibleMarkup(html)).replace(/응모한 이벤트/g, "");
+}
+function isEntry(text) {
+	return ENTRY.test(text.replace(/\s+/g, " "));
+}
+function tidy(value) {
+	return stripTags(value).replace(/&bull;|&middot;/gi, "·").replace(/\s+/g, " ").trim();
+}
+function clue(text, title, blurb = "") {
+	const nice = tidy(blurb);
+	if (nice.length >= 12 && nice.length <= 140 && nice !== title && !/바로가기|메뉴/.test(nice)) return nice;
+	return text.split("\n").map((item) => item.replace(/&bull;/gi, "·").replace(/\s+/g, " ").trim()).find((item) => item.length >= 16 && item.length <= 120 && ENTRY.test(item) && !/바로가기|메뉴|닫기|로그인|copyright/i.test(item)) ?? title;
+}
+async function keepIfEntry(issuer, externalId, title, blurb, start, end, applyUrl) {
+	const preview = `${title} ${blurb}`;
+	if (isEntry(preview)) return eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl);
+	try {
+		const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8e3));
+		if (!isEntry(text)) return null;
+		return eventOf(issuer, externalId, title, clue(text, title, blurb), start, end, applyUrl);
+	} catch {
+		return null;
+	}
+}
+async function collectMirae(today) {
+	const issuer = "mirae";
+	const listUrl = issuerMeta(issuer).listUrl;
+	try {
+		const pages = await Promise.all([1, 2].map((page) => fetchText(`${listUrl}?currentPage=${page}`, {}, 8e3).catch(() => "")));
+		const seen = /* @__PURE__ */ new Set();
+		const rows = [];
+		for (const html of pages) for (const match of html.matchAll(/doView\('(\d+)'[\s\S]{0,900}?class="evTit">([^<]+)<\/dd>[\s\S]{0,240}?class="evDate">([^<]+)<\/dd>/g)) {
+			const id = match[1];
+			if (seen.has(id)) continue;
+			const title = stripTags(match[2]).replace(/\s+/g, " ").trim();
+			const range = dateRange(match[3]);
+			if (!range || title.length < 4 || !isOngoing(range.end, today) || range.start > today) continue;
+			seen.add(id);
+			rows.push({
+				id,
+				title,
+				start: range.start,
+				end: range.end
+			});
+		}
+		const events = (await mapPool(rows, 4, (row) => keepIfEntry(issuer, row.id, row.title, row.title, row.start, row.end, `https://securities.miraeasset.com/hki/hki7000/v05.do?cs_ecis_id=${row.id}`))).filter((event) => event !== null);
+		return {
+			issuer,
+			ok: true,
+			message: events.length ? `진행 목록에서 응모·쿠폰·추첨 ${events.length}건을 읽었습니다.` : `진행 목록 ${rows.length}건을 읽었지만 응모·쿠폰·추첨은 없습니다.`,
+			events
+		};
+	} catch (error) {
+		return {
+			issuer,
+			ok: false,
+			message: `미래에셋증권 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+			events: []
+		};
+	}
+}
+async function collectSamsungSec(today) {
+	const issuer = "samsungsec";
+	const listUrl = issuerMeta(issuer).listUrl;
+	try {
+		const raw = await fetchText("https://www.samsungpop.com/mbw/customer/noticeEvent.do", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/x-www-form-urlencoded",
+				"X-Requested-With": "XMLHttpRequest",
+				Referer: listUrl
+			},
+			body: "cmd=getEventList&currentPage=1&rowsPerPage=30&listRow=30&ntcSect=3&EtcConts4=Y&todayEnd=0"
+		}, 8e3);
+		const rows = (JSON.parse(raw).list ?? []).map((item) => {
+			const range = dateRange(item.period ?? "");
+			const title = (item.ntcTitle1 ?? "").replace(/\s+/g, " ").trim();
+			if (!item.menuSeqNo || !range || title.length < 4) return null;
+			if (!isOngoing(range.end, today) || range.start > today) return null;
+			return {
+				id: item.menuSeqNo,
+				title,
+				blurb: item.EtcConts5 ?? "",
+				start: range.start,
+				end: range.end
+			};
+		}).filter((row) => row !== null);
+		const events = (await mapPool(rows, 4, (row) => keepIfEntry(issuer, row.id, row.title, row.blurb, row.start, row.end, `https://www.samsungpop.com/mbw/customer/noticeEvent.do?cmd=eventView&MenuSeqNo=${row.id}`))).filter((event) => event !== null);
+		return {
+			issuer,
+			ok: true,
+			message: events.length ? `진행 ${rows.length}건 중 응모·쿠폰·추첨 ${events.length}건입니다.` : `진행 ${rows.length}건을 읽었지만 응모·쿠폰·추첨은 없습니다.`,
+			events
+		};
+	} catch (error) {
+		return {
+			issuer,
+			ok: false,
+			message: `삼성증권 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+			events: []
+		};
+	}
+}
+async function collectHanaSec(today) {
+	const issuer = "hanasec";
+	const listUrl = issuerMeta(issuer).listUrl;
+	try {
+		const rows = [...(await fetchText(listUrl, {}, 8e3)).matchAll(/bbsSeq=(\d+)[\s\S]{0,360}?class="title">([^<]+)<\/span>[\s\S]{0,240}?class="date">\s*([^<]+)/g)].map((match) => {
+			const title = stripTags(match[2]).replace(/\s+/g, " ").trim();
+			const range = dateRange(match[3]);
+			if (!range || title.length < 4 || !isOngoing(range.end, today) || range.start > today) return null;
+			return {
+				id: match[1],
+				title,
+				start: range.start,
+				end: range.end
+			};
+		}).filter((row) => row !== null);
+		const unique = [...new Map(rows.map((row) => [row.id, row])).values()];
+		const events = (await mapPool(unique, 4, (row) => keepIfEntry(issuer, row.id, row.title, row.title, row.start, row.end, `https://www.hanaw.com/corebbs5/eventIng/view/view.cmd?bbsSeq=${row.id}`))).filter((event) => event !== null);
+		return {
+			issuer,
+			ok: true,
+			message: events.length ? `진행 ${unique.length}건 중 응모·쿠폰·추첨 ${events.length}건입니다.` : `진행 ${unique.length}건을 읽었지만 응모·쿠폰·추첨은 없습니다.`,
+			events
+		};
+	} catch (error) {
+		return {
+			issuer,
+			ok: false,
+			message: `하나증권 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+			events: []
+		};
+	}
+}
+async function collectKbSec(today) {
+	const issuer = "kbsec";
+	try {
+		const raw = await fetchText("https://www.kbsec.com/main/jsp/main_board.jsp?bdgubun=2", {}, 8e3);
+		const events = (await mapPool((JSON.parse(raw).list ?? []).map((item) => {
+			const title = (item.title ?? "").replace(/\s+/g, " ").trim();
+			const start = dateRange(`${item.date ?? ""} ~ ${item.date ?? ""}`)?.start;
+			if (!item.url || !start || title.length < 4 || start > today) return null;
+			return {
+				id: item.url,
+				title,
+				start,
+				applyUrl: new URL(item.url, "https://www.kbsec.com").href
+			};
+		}).filter((row) => row !== null).slice(0, 12), 4, async (row) => {
+			try {
+				const text = pageText(await fetchText(row.applyUrl, {}, 8e3));
+				const range = periodRange(text);
+				if (!isEntry(text) || !range || !isOngoing(range.end, today) || range.start > today) return null;
+				return eventOf(issuer, row.id, row.title, clue(text, row.title), range.start, range.end, row.applyUrl);
+			} catch {
+				return null;
+			}
+		})).filter((event) => event !== null);
+		return {
+			issuer,
+			ok: true,
+			message: events.length ? `최근 글에서 기간이 확인된 응모·쿠폰·추첨 ${events.length}건입니다.` : "목록은 열렸지만 기간이 적힌 응모·쿠폰·추첨은 없습니다. 안내가 이미지인 글은 뺐습니다.",
+			events
+		};
+	} catch (error) {
+		return {
+			issuer,
+			ok: false,
+			message: `KB증권 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+			events: []
+		};
+	}
+}
+async function collectIbkBank(today) {
+	const issuer = "ibkbank";
+	const listUrl = issuerMeta(issuer).listUrl;
+	try {
+		const rows = [...(await fetchText(listUrl, {}, 8e3)).matchAll(/evnt_srno=(\d+)&evnt_dscd=([A-Z])[\s\S]{0,500}?alt="([^"]*)"[\s\S]{0,1600}?기간<\/span>([\s\S]*?)<\/li>/g)].map((match) => {
+			const title = stripTags(match[3]).replace(/\s+/g, " ").trim();
+			const range = dateRange(stripTags(match[4]));
+			if (!range || title.length < 4 || /카드/.test(title)) return null;
+			if (!isOngoing(range.end, today) || range.start > today) return null;
+			return {
+				id: `${match[2]}-${match[1]}`,
+				srno: match[1],
+				code: match[2],
+				title,
+				start: range.start,
+				end: range.end
+			};
+		}).filter((row) => row !== null);
+		const unique = [...new Map(rows.map((row) => [row.id, row])).values()];
+		const events = (await mapPool(unique.slice(0, 12), 4, (row) => keepIfEntry(issuer, row.id, row.title, row.title, row.start, row.end, `https://www.ibk.co.kr/event/ingDetailEvent.ibk?evnt_srno=${row.srno}&evnt_dscd=${row.code}&pageId=CM01060100`))).filter((event) => event !== null);
+		return {
+			issuer,
+			ok: true,
+			message: events.length ? `카드가 아닌 행사 ${unique.length}건 중 응모·쿠폰·추첨 ${events.length}건입니다.` : `카드가 아닌 행사 ${unique.length}건을 읽었지만 응모·쿠폰·추첨은 없습니다.`,
+			events
+		};
+	} catch (error) {
+		return {
+			issuer,
+			ok: false,
+			message: `IBK 행사 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+			events: []
+		};
+	}
+}
+async function collectWooriBank(today) {
+	const issuer = "wooribank";
+	const listUrl = issuerMeta(issuer).listUrl;
+	try {
+		const blocks = [...(await fetchText(listUrl, {}, 8e3)).matchAll(/<dl class="list-set[\s\S]*?<\/dl>/g)];
+		const rows = [];
+		for (const block of blocks) {
+			const chunk = block[0];
+			const id = chunk.match(/goDetail\('(\d+)'/)?.[1];
+			const title = stripTags(chunk.match(/<dt><a[^>]*>([\s\S]*?)<\/a>/)?.[1] ?? "");
+			const summary = stripTags(chunk.match(/<dd>([\s\S]*?)<\/dd>/)?.[1] ?? "");
+			const range = dateRange(chunk.match(/이벤트기간\s*:\s*([^<]+)/)?.[1] ?? "");
+			if (!id || title.length < 4 || !range || !isOngoing(range.end, today)) continue;
+			rows.push({
+				id,
+				title,
+				summary,
+				start: range.start,
+				end: range.end
+			});
+		}
+		const events = (await mapPool(rows, 2, async (row) => {
+			const applyUrl = listUrl;
+			if (isEntry(`${row.title} ${row.summary}`)) return eventOf(issuer, row.id, row.title, row.summary || row.title, row.start, row.end, applyUrl);
+			try {
+				const text = pageText(await fetchText("https://spot.wooribank.com/pot/Dream?withyou=EVEVT0001&cc=c001308:c001386", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/x-www-form-urlencoded",
+						Referer: listUrl
+					},
+					body: `NO=${row.id}`
+				}, 8e3));
+				if (!isEntry(`${row.title} ${row.summary} ${text}`)) return null;
+				return eventOf(issuer, row.id, row.title, clue(text, row.summary || row.title), row.start, row.end, applyUrl);
+			} catch {
+				return null;
+			}
+		})).filter((event) => event !== null);
+		return {
+			issuer,
+			ok: true,
+			message: events.length ? `진행 ${blocks.length}건 중 응모·쿠폰·추첨 ${events.length}건입니다.` : `진행 ${blocks.length}건을 읽었지만 본문에 응모·쿠폰·추첨이 없습니다.`,
+			events
+		};
+	} catch (error) {
+		return {
+			issuer,
+			ok: false,
+			message: `우리은행 이벤트 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+			events: []
+		};
+	}
+}
+function genericEvents(issuer, html, today) {
+	const listUrl = issuerMeta(issuer).listUrl;
+	const visible = visibleMarkup(html);
+	const events = [];
+	const seen = /* @__PURE__ */ new Set();
+	for (const match of visible.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
+		const href = match[1];
+		if (/javascript:|^#|로그인|메뉴/.test(href)) continue;
+		const text = stripTags(match[2]).replace(/\s+/g, " ").trim();
+		if (text.length < 8 || text.length > 80 || !ENTRY.test(text)) continue;
+		let applyUrl;
+		try {
+			applyUrl = new URL(href, listUrl).href;
+		} catch {
+			continue;
+		}
+		if (seen.has(applyUrl)) continue;
+		const range = dateRange(stripTags(visible.slice(match.index ?? 0, (match.index ?? 0) + 500)));
+		if (!range || !isOngoing(range.end, today)) continue;
+		seen.add(applyUrl);
+		events.push(eventOf(issuer, String(seen.size), text, text, range.start, range.end, applyUrl));
+		if (events.length >= 12) break;
+	}
+	return events;
+}
+async function collectGeneric(issuer, today) {
+	const meta = issuerMeta(issuer);
+	try {
+		const html = await fetchText(meta.listUrl, {}, 8e3);
+		const title = stripTags(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+		if (/요청 오류|이용불가|오류페이지|접근.?거부|not found/i.test(title)) return {
+			issuer,
+			ok: false,
+			message: `${meta.name} 목록이 막혀 있습니다. 앱이나 웹에서 확인하세요.`,
+			events: []
+		};
+		const events = genericEvents(issuer, html, today);
+		return {
+			issuer,
+			ok: true,
+			message: events.length ? `${meta.name}에서 응모·쿠폰·추첨 ${events.length}건을 읽었습니다.` : `${meta.name} 화면에는 날짜가 있는 응모·쿠폰·추첨이 없습니다. 앱에서 확인하세요.`,
+			events
+		};
+	} catch (error) {
+		return {
+			issuer,
+			ok: false,
+			message: `${meta.name} 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+			events: []
+		};
+	}
+}
+var SPECIAL = {
+	mirae: collectMirae,
+	samsungsec: collectSamsungSec,
+	hanasec: collectHanaSec,
+	kbsec: collectKbSec,
+	wooribank: collectWooriBank,
+	ibkbank: collectIbkBank
+};
+async function collectMarkets(today) {
+	return mapPool(ISSUERS.filter((item) => item.market !== "card"), 4, (item) => {
+		const run = SPECIAL[item.id];
+		return run ? run(today) : collectGeneric(item.id, today);
+	});
 }
 var SHINHAN_LIST = "https://www.shinhancard.com/mob/static/json/vendor/evnPgsList01.json";
 var HYUNDAI_LIST = "https://www.hyundaicard.com/cpb/ev/CPBEV0101_01.hc";
@@ -929,7 +1585,7 @@ async function collectIbk(today) {
 	}
 }
 async function collectLive(today = seoulToday()) {
-	return Promise.all([
+	const [cards, markets] = await Promise.all([Promise.all([
 		collectShinhan(today),
 		collectSamsung(today),
 		collectHyundai(today),
@@ -939,7 +1595,8 @@ async function collectLive(today = seoulToday()) {
 		collectNh(today),
 		collectBc(today),
 		collectIbk(today)
-	]);
+	]), collectMarkets(today)]);
+	return [...cards, ...markets];
 }
 var SNAPSHOT_AT = "2026-10-08T02:07:37.639Z";
 var SNAPSHOT_EVENTS = [
@@ -2039,8 +2696,8 @@ var QUIET = {
 	nh: "NH농협카드 응모 탭을 이번엔 열지 못했습니다.",
 	bc: "BC·페이북 목록을 이번엔 열지 못했습니다.",
 	ibk: "IBK 카드 행사 목록을 이번엔 열지 못했습니다.",
-	kakaobank: "카카오뱅크 체크 혜택은 결제하면 적용되는 경우가 많아 별도 응모 목록이 없습니다.",
-	tossbank: "토스뱅크 체크 혜택은 앱에서 고르는 방식이라 홈페이지 응모 목록이 없습니다."
+	kakaobank: "카카오뱅크 이벤트는 앱에서 열리는 경우가 많습니다. 목록이 비면 앱으로 이동하세요.",
+	tossbank: "토스뱅크 이벤트는 앱 안 행사가 많습니다. 목록이 비면 앱으로 이동하세요."
 };
 function asList(value) {
 	try {
@@ -2083,7 +2740,7 @@ function fullReport(partial, counts) {
 			listUrl: issuer.listUrl,
 			count,
 			ok: false,
-			message: QUIET[issuer.id] ?? "이번 수집에서 응모 이벤트를 찾지 못했습니다."
+			message: QUIET[issuer.id] ?? "이번 수집에서 응모·쿠폰·추첨 이벤트를 찾지 못했습니다."
 		};
 	});
 }
@@ -2228,17 +2885,5 @@ async function refreshBoard() {
   `;
 	return readBoard();
 }
-var getBoard_createServerFn_handler = createServerRpc({
-	id: "8c14451dae457ac2e171179defe6369842c145c577862973196c2960056b5a59",
-	name: "getBoard",
-	filename: "src/lib/events/board.functions.ts"
-}, (opts) => getBoard.__executeServer(opts));
-var getBoard = createServerFn({ method: "GET" }).handler(getBoard_createServerFn_handler, async () => loadBoard());
-var reloadBoard_createServerFn_handler = createServerRpc({
-	id: "c20b50b61dfab16855048e96c1dbd7dab49bfa123c16e3c0754efa0768c00509",
-	name: "reloadBoard",
-	filename: "src/lib/events/board.functions.ts"
-}, (opts) => reloadBoard.__executeServer(opts));
-var reloadBoard = createServerFn({ method: "POST" }).handler(reloadBoard_createServerFn_handler, async () => refreshBoard());
 //#endregion
-export { getBoard_createServerFn_handler, reloadBoard_createServerFn_handler };
+export { refreshBoard as a, loadBoard as i, MARKETS as n, issuerMeta as r, ISSUERS as t };

@@ -1,9 +1,10 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { _ as createFileRoute, b as require_jsx_runtime, d as Scripts, f as HeadContent, g as lazyRouteComponent, h as Outlet, m as createRouter, q as require_react, v as createRootRoute, y as useRouter } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as TSS_SERVER_FUNCTION, r as getServerFnById, t as createServerFn } from "./ssr.mjs";
+import { a as refreshBoard } from "./store.server-B5M9eq0J.mjs";
 import { t as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { a as union, i as string, n as number, r as object, t as literal } from "../_libs/zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-BQq9mKRQ.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-ZLc4sc69.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
@@ -307,15 +308,15 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-CKjJJ2Ka.css";
-var APP_NAME = "응모만";
-var Route$1 = createRootRoute({
+var styles_default = "/assets/styles-BI0Q6QkT.css";
+var APP_NAME = "ㅇㅁㅁㅇ";
+var Route$2 = createRootRoute({
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
 			{
 				name: "viewport",
-				content: "width=device-width, initial-scale=1"
+				content: "width=device-width, initial-scale=1, viewport-fit=cover"
 			},
 			{ title: APP_NAME },
 			{
@@ -375,17 +376,39 @@ var createSsrRpc = (functionId) => {
 };
 var getBoard = createServerFn({ method: "GET" }).handler(createSsrRpc("8c14451dae457ac2e171179defe6369842c145c577862973196c2960056b5a59"));
 var reloadBoard = createServerFn({ method: "POST" }).handler(createSsrRpc("c20b50b61dfab16855048e96c1dbd7dab49bfa123c16e3c0754efa0768c00509"));
-var $$splitComponentImporter = () => import("./routes-DKbQE5Af.mjs");
-var Route = createFileRoute("/")({
+var $$splitComponentImporter = () => import("./routes-Da9usD_7.mjs");
+var Route$1 = createFileRoute("/")({
 	loader: () => getBoard(),
 	component: lazyRouteComponent($$splitComponentImporter, "component")
 });
-var rootRouteChildren = { IndexRoute: Route.update({
-	id: "/",
-	path: "/",
-	getParentRoute: () => Route$1
-}) };
-var routeTree = Route$1._addFileChildren(rootRouteChildren)._addFileTypes();
+/** 10:00 Asia/Seoul = 01:00 UTC. Vercel Cron calls this once a day. */
+var Route = createFileRoute("/api/cron/collect")({ server: { handlers: { GET: async ({ request }) => {
+	const secret = process.env.CRON_SECRET;
+	const bearer = request.headers.get("authorization");
+	const fromCron = request.headers.get("x-vercel-cron");
+	if (secret) {
+		if (bearer !== `Bearer ${secret}`) return new Response("unauthorized", { status: 401 });
+	} else if (!fromCron) return new Response("unauthorized", { status: 401 });
+	const board = await refreshBoard();
+	return Response.json({
+		ok: true,
+		collectedAt: board.collectedAt,
+		count: board.events.length
+	});
+} } } });
+var rootRouteChildren = {
+	IndexRoute: Route$1.update({
+		id: "/",
+		path: "/",
+		getParentRoute: () => Route$2
+	}),
+	ApiCronCollectRoute: Route.update({
+		id: "/api/cron/collect",
+		path: "/api/cron/collect",
+		getParentRoute: () => Route$2
+	})
+};
+var routeTree = Route$2._addFileChildren(rootRouteChildren)._addFileTypes();
 var router_exports = /* @__PURE__ */ __exportAll({ getRouter: () => getRouter });
 function getRouter() {
 	return createRouter({
@@ -394,4 +417,4 @@ function getRouter() {
 	});
 }
 //#endregion
-export { Route as n, reloadBoard as r, router_exports as t };
+export { Route$1 as n, reloadBoard as r, router_exports as t };
