@@ -265,7 +265,9 @@ export async function refreshBoard(): Promise<Board> {
           entry = excluded.entry
       `;
     }
-    const changes = diffEventLists(previousEvents, hit.events, [
+    // The collection type makes entry optional; the database stores true by default.
+    const normalizedEvents = hit.events.map((event) => ({ ...event, entry: event.entry !== false }));
+    const changes = diffEventLists(previousEvents, normalizedEvents, [
       ["title", "제목"], ["summary", "내용"], ["benefit", "혜택"],
       ["conditions", "조건"], ["exclusions", "유의사항"], ["startDate", "시작일"],
       ["endDate", "종료일"], ["applyUrl", "링크"], ["entry", "응모 여부"],
@@ -284,8 +286,12 @@ export async function refreshBoard(): Promise<Board> {
     merged.push({
       id: hit.issuer,
       ok: hit.ok,
-      message: hit.ok ? hit.message : `${hit.message} 마지막 목록을 유지합니다.`,
-      count: hit.ok ? hit.events.length : (prior.find((item) => item.id === hit.issuer)?.count ?? 0),
+      message: hit.ok && hit.events.length > 0
+        ? hit.message
+        : `${hit.message} 마지막 목록을 유지합니다.`,
+      count: hit.ok && hit.events.length > 0
+        ? hit.events.length
+        : (prior.find((item) => item.id === hit.issuer)?.count ?? 0),
     });
   }
   await sql`
