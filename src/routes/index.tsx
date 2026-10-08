@@ -22,14 +22,20 @@ function Home() {
   const [market, setMarket] = useState<Market>("card");
   const [issuer, setIssuer] = useState<IssuerId | "all">("all");
   const [sort, setSort] = useState<"soon" | "new">("soon");
+  const [scope, setScope] = useState<"entry" | "all" | "other">("all");
   const [query, setQuery] = useState("");
   const [openIds, setOpenIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
+  const scoped = useMemo(
+    () => board.events.filter((event) => matchesScope(event, scope)),
+    [board.events, scope],
+  );
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return board.events
+    return scoped
       .filter((event) => issuerMeta(event.issuer).market === market)
       .filter((event) => issuer === "all" || event.issuer === issuer)
       .filter((event) => {
@@ -50,7 +56,7 @@ function Home() {
           ? b.startDate.localeCompare(a.startDate) || a.endDate.localeCompare(b.endDate)
           : a.endDate.localeCompare(b.endDate) || a.title.localeCompare(b.title, "ko"),
       );
-  }, [board.events, issuer, market, query, sort]);
+  }, [scoped, issuer, market, query, sort]);
 
   function toggle(id: string) {
     setOpenIds((current) =>
@@ -107,7 +113,7 @@ function Home() {
 
       <div className="mt-3 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5" role="tablist" aria-label="종류">
         {MARKETS.map((item) => {
-          const count = board.events.filter((event) => issuerMeta(event.issuer).market === item.id).length;
+          const count = scoped.filter((event) => issuerMeta(event.issuer).market === item.id).length;
           const active = market === item.id;
           return (
             <button
@@ -126,6 +132,37 @@ function Home() {
               }
             >
               {item.label} {count}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5" role="tablist" aria-label="응모 여부">
+        {(
+          [
+            ["entry", "응모"],
+            ["all", "전체"],
+            ["other", "응모 아님"],
+          ] as const
+        ).map(([id, label]) => {
+          const active = scope === id;
+          const count = board.events.filter(
+            (event) => issuerMeta(event.issuer).market === market && matchesScope(event, id),
+          ).length;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setScope(id)}
+              className={
+                active
+                  ? "h-8 rounded-full bg-ink text-xs font-medium text-paper"
+                  : "h-8 rounded-full text-xs text-muted"
+              }
+            >
+              {label} {count}
             </button>
           );
         })}
@@ -155,10 +192,10 @@ function Home() {
 
       <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 pb-0.5 sm:mx-0 sm:px-0">
         <Chip active={issuer === "all"} onClick={() => setIssuer("all")}>
-          전체 {board.events.filter((event) => issuerMeta(event.issuer).market === market).length}
+          전체 {scoped.filter((event) => issuerMeta(event.issuer).market === market).length}
         </Chip>
         {ISSUERS.filter((item) => item.market === market).map((item) => {
-          const count = board.events.filter((event) => event.issuer === item.id).length;
+          const count = scoped.filter((event) => event.issuer === item.id).length;
           return (
             <Chip key={item.id} active={issuer === item.id} onClick={() => setIssuer(item.id)}>
               {item.short} {count}
@@ -171,7 +208,11 @@ function Home() {
 
       {visible.length === 0 ? (
         <p className="mt-2 rounded-2xl border border-dashed border-line bg-card px-4 py-6 text-center text-sm text-muted">
-          이 종류에서 응모·쿠폰·추첨 이벤트가 없습니다. 아래 회사 앱에서 확인하세요.
+          {scope === "entry"
+            ? "이 종류에서 응모 이벤트가 없습니다."
+            : scope === "other"
+              ? "이 종류에서 응모가 아닌 이벤트가 없습니다."
+              : "이 종류에서 이벤트가 없습니다. 다시 수집하면 전체 행사를 가져옵니다."}
         </p>
       ) : (
         <ul className="mt-1.5 overflow-hidden rounded-2xl border border-line bg-card">
@@ -246,7 +287,7 @@ function EventRow({
             rel="noreferrer"
             className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            응모
+            {event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -300,7 +341,7 @@ function EventRow({
             rel="noreferrer"
             className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            응모
+            {event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -327,7 +368,7 @@ function EventBody({ event, id }: { event: EntryEvent; id: string }) {
       <p className="mt-1.5 text-xs tabular-nums text-muted">
         {issuerName(event.issuer)} · {formatDay(event.startDate)} – {formatDay(event.endDate)}
       </p>
-      <h3 className="mt-2 text-sm font-semibold">응모 조건</h3>
+      <h3 className="mt-2 text-sm font-semibold">{event.entry === false ? "안내" : "응모 조건"}</h3>
       <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm leading-relaxed text-muted">
         {(event.conditions.length ? event.conditions : ["카드사 페이지의 조건을 확인하세요."]).map(
           (line) => (
@@ -351,7 +392,7 @@ function EventBody({ event, id }: { event: EntryEvent; id: string }) {
         rel="noreferrer"
         className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
       >
-        {issuerName(event.issuer)}에서 응모
+        {issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}
         <ArrowUpRight className="size-4" />
       </a>
     </div>
@@ -421,6 +462,13 @@ function Deadline({ end, today }: { end: string; today: string }) {
       {label}
     </span>
   );
+}
+
+function matchesScope(event: EntryEvent, scope: "entry" | "all" | "other"): boolean {
+  const entry = event.entry !== false;
+  if (scope === "entry") return entry;
+  if (scope === "other") return !entry;
+  return true;
 }
 
 function issuerName(id: IssuerId): string {

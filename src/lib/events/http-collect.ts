@@ -79,13 +79,12 @@ async function collectShinhan(today: string): Promise<CollectHit> {
         const applyUrl = new URL(row.item.hpgEvtDlPgeUrlAr, "https://www.shinhancard.com").href;
         try {
           const html = await fetchText(applyUrl);
-          if (!html.includes("응모하기")) return null;
           const summaryRaw = stripTags(
             html.match(/class="evt-visual__summary"\s*>([\s\S]*?)<\/div>/)?.[1] ?? "",
           );
           const detailStart = html.indexOf("evt-detail");
           const detail = stripTags(html.slice(detailStart, detailStart + 14000));
-          if (!isEntryCopy(`${summaryRaw}\n${detail}\n응모하기`)) return null;
+          const entry = html.includes("응모하기") && isEntryCopy(`${summaryRaw}\n${detail}\n응모하기`);
           const rules = splitRules(detail);
           const summary = cleanSummary(row.item.mobWbEvtNm, summaryRaw, rules.conditions);
           return eventBase(issuer, row.item.mobWbEvtRvN, {
@@ -97,6 +96,7 @@ async function collectShinhan(today: string): Promise<CollectHit> {
             startDate: row.start,
             endDate: row.end,
             applyUrl,
+            entry,
           });
         } catch {
           return null;
@@ -152,7 +152,6 @@ async function collectHyundai(today: string): Promise<CollectHit> {
           const start = page.indexOf('class="event_content"');
           const chunk = visibleMarkup(start >= 0 ? page.slice(start, start + 9000) : "");
           const text = stripTags(chunk);
-          if (!isEntryCopy(text)) return null;
           const rules = splitRules(text);
           const summary = cleanSummary(card.title, text.split("\n").find((line) => line.length > 12) ?? "", rules.conditions);
           return eventBase(issuer, card.code, {
@@ -164,6 +163,7 @@ async function collectHyundai(today: string): Promise<CollectHit> {
             startDate: card.range.start,
             endDate: card.range.end,
             applyUrl: card.applyUrl,
+            entry: isEntryCopy(text),
           });
         } catch {
           return null;
@@ -226,8 +226,7 @@ async function collectKb(today: string): Promise<CollectHit> {
           const visible = visibleMarkup(page);
           const start = visible.indexOf("eventViewWrap");
           const text = stripTags(visible.slice(start >= 0 ? start : 0, (start >= 0 ? start : 0) + 7000));
-          if (!/응모하고|응모하기|응모\s*필수|응모\s*후/.test(text)) return null;
-          if (/무이자/.test(card.title) && !/응모하고|응모하기/.test(text)) return null;
+          const entry = /응모하고|응모하기|응모\s*필수|응모\s*후/.test(text);
           const rules = splitRules(text);
           const summary = cleanSummary(card.title, "", rules.conditions);
           return eventBase(issuer, card.id, {
@@ -239,6 +238,7 @@ async function collectKb(today: string): Promise<CollectHit> {
             startDate: card.range.start,
             endDate: card.range.end,
             applyUrl,
+            entry,
           });
         } catch {
           return null;
@@ -368,8 +368,7 @@ async function collectSamsung(today: string): Promise<CollectHit> {
           });
           const text = stripTags(visibleMarkup(html));
           const simple = vo?.cmpSimpEntrYn === "Y";
-          if (!simple && !isEntryCopy(text)) return null;
-          const packed = rulesOr(card.title, text, "삼성카드 이벤트 페이지에서 응모 버튼으로 신청합니다.");
+          const packed = rulesOr(card.title, text, "삼성카드 이벤트 페이지에서 조건을 확인하세요.");
           return eventBase(issuer, card.cmsId, {
             title: (vo?.cmpTitNm || card.title).replace(/\s+/g, " ").trim(),
             summary: packed.summary,
@@ -379,6 +378,7 @@ async function collectSamsung(today: string): Promise<CollectHit> {
             startDate: card.start || today,
             endDate: card.end,
             applyUrl: `https://www.samsungcard.com/personal/event/ing/UHPPBE1403M0.jsp?cms_id=${card.cmsId}`,
+            entry: simple || isEntryCopy(text),
           });
         } catch {
           return null;
@@ -450,8 +450,7 @@ async function collectLotte(today: string): Promise<CollectHit> {
           const page = await fetchText(applyUrl, { headers: { Referer: listUrl } });
           const start = page.indexOf('class="eventDetail"');
           const text = stripTags(visibleMarkup(start >= 0 ? page.slice(start, start + 14000) : ""));
-          if (!isEntryCopy(text)) return null;
-          const packed = rulesOr(card.title, text, "롯데카드 이벤트 화면에서 응모합니다.");
+          const packed = rulesOr(card.title, text, "롯데카드 이벤트 화면에서 조건을 확인하세요.");
           return eventBase(issuer, card.id, {
             title: card.title,
             summary: packed.summary,
@@ -461,6 +460,7 @@ async function collectLotte(today: string): Promise<CollectHit> {
             startDate: card.start,
             endDate: card.end,
             applyUrl,
+            entry: isEntryCopy(text),
           });
         } catch {
           return null;
@@ -499,7 +499,6 @@ async function collectHana(today: string): Promise<CollectHit> {
         const range = parseRange(stripTags(match[4]));
         const title = stripTags(match[3]).replace(/\s+/g, " ");
         if (!range || range.start > today) return null;
-        if (/무이자/.test(title) && !/응모/.test(title)) return null;
         return { id: match[2], path: match[1], title, start: range.start, end: range.end };
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
@@ -512,8 +511,7 @@ async function collectHana(today: string): Promise<CollectHit> {
           const page = await fetchText(applyUrl, { headers: { Referer: listUrl } });
           const sections = [...page.matchAll(/<section class="eVgroup[\s\S]*?<\/section>/g)].map((match) => match[0]).join("\n");
           const text = stripTags(visibleMarkup(sections));
-          if (!isEntryCopy(text)) return null;
-          const packed = rulesOr(card.title, text, "하나카드 이벤트 화면에서 응모합니다.");
+          const packed = rulesOr(card.title, text, "하나카드 이벤트 화면에서 조건을 확인하세요.");
           return eventBase(issuer, card.id, {
             title: card.title,
             summary: packed.summary,
@@ -523,6 +521,7 @@ async function collectHana(today: string): Promise<CollectHit> {
             startDate: card.start,
             endDate: card.end,
             applyUrl,
+            entry: isEntryCopy(text) || /응모/.test(card.title),
           });
         } catch {
           return null;
@@ -605,6 +604,7 @@ async function collectNh(today: string): Promise<CollectHit> {
           startDate: card.start,
           endDate: card.end,
           applyUrl,
+          entry: isEntryCopy(`${text}\n${card.title}`) || /응모/.test(card.title),
         });
       })
     ).filter((event): event is EntryEvent => event !== null);
@@ -659,9 +659,7 @@ async function collectBc(today: string): Promise<CollectHit> {
         const typed = PAYBOOC_ENTRY.has(item.pybcUnifEvntTypCd || "");
         const tagged = /마이태그|응모/.test(title);
         if (!item.pybcUnifEvntNo || !end || item.endEvent || start > today) return null;
-        if (!typed && !tagged) return null;
-        if (/무이자|할부/.test(title) && !typed && !/응모/.test(title)) return null;
-        return { id: item.pybcUnifEvntNo, title, start, end, typed };
+        return { id: item.pybcUnifEvntNo, title, start, end, typed: typed || tagged };
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
     const chosen = rankSoon(cards, today, 16);
@@ -709,13 +707,12 @@ async function collectBc(today: string): Promise<CollectHit> {
           }
           const text = `${groups}\n${notice}`;
           const mytag = /마이태그/.test(card.title);
-          if (!card.typed && !mytag && !isEntryCopy(`${text}\n${card.title}`)) return null;
           const packed = rulesOr(
             card.title,
             text,
             card.typed
               ? "페이북이 로그인·비로그인 응모형으로 분류한 이벤트입니다."
-              : "페이북 마이태그(응모) 이벤트입니다. 태그와 결제 조건은 카드사 화면에서 확인하세요.",
+              : "페이북 이벤트입니다. 조건은 카드사 화면에서 확인하세요.",
           );
           return eventBase(issuer, card.id, {
             title: card.title,
@@ -726,18 +723,19 @@ async function collectBc(today: string): Promise<CollectHit> {
             startDate: card.start || today,
             endDate: card.end,
             applyUrl,
+            entry: card.typed || mytag || isEntryCopy(`${text}\n${card.title}`),
           });
         } catch {
-          if (!card.typed) return null;
           return eventBase(issuer, card.id, {
             title: card.title,
             summary: card.title,
             benefit: card.title.slice(0, 80),
-            conditions: ["페이북이 응모형으로 분류한 이벤트입니다. 대상과 제외 조건은 응모 화면에서 확인하세요."],
+            conditions: ["대상과 제외 조건은 행사 화면에서 확인하세요."],
             exclusions: [],
             startDate: card.start || today,
             endDate: card.end,
             applyUrl,
+            entry: card.typed,
           });
         }
       })
@@ -773,9 +771,6 @@ async function collectIbk(today: string): Promise<CollectHit> {
       const range = parseRange(stripTags(match[3]));
       const title = stripTags(match[2]).replace(/\s+/g, " ");
       if (!range || range.start > today) return null;
-      const cardLike = /카드|응모/.test(title);
-      if (!cardLike) return null;
-      if (/무이자/.test(title) && !/응모/.test(title)) return null;
       return { id: match[1], title, start: range.start, end: range.end };
     }).filter((row): row is NonNullable<typeof row> => row !== null);
     const unique = [...new Map(cards.map((card) => [card.id, card])).values()];
@@ -789,8 +784,8 @@ async function collectIbk(today: string): Promise<CollectHit> {
             .map((match) => stripTags(match[1]).replace(/[·•]/g, "\n"))
             .filter((alt) => !/기업은행 로고|이전|다음/.test(alt));
           const text = alts.join("\n");
-          if (!/신청하기|응모하기|사전 신청|쿠폰\s*다운로드|이벤트\s*응모/.test(text)) return null;
-          const packed = rulesOr(card.title, text, "IBK 카드 행사 화면에서 신청 또는 쿠폰을 받아야 혜택이 적용됩니다.");
+          const entry = /신청하기|응모하기|사전 신청|쿠폰\s*다운로드|이벤트\s*응모/.test(text);
+          const packed = rulesOr(card.title, text, "IBK 행사 화면에서 조건을 확인하세요.");
           return eventBase(issuer, card.id, {
             title: card.title,
             summary: packed.summary,
@@ -800,6 +795,7 @@ async function collectIbk(today: string): Promise<CollectHit> {
             startDate: card.start,
             endDate: card.end,
             applyUrl,
+            entry,
           });
         } catch {
           return null;

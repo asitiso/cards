@@ -1,7 +1,8 @@
-//#region node_modules/.nitro/vite/services/ssr/assets/html-BxjaJV6T.js
+//#region node_modules/.nitro/vite/services/ssr/assets/html-C1SEj9i4.js
 var _0002_events_default = "create table if not exists entry_events (\n  id text primary key,\n  issuer text not null,\n  title text not null,\n  summary text not null,\n  benefit text not null,\n  conditions text not null,\n  exclusions text not null,\n  start_date date,\n  end_date date,\n  apply_url text not null,\n  list_url text not null,\n  active boolean not null default true,\n  collected_at timestamptz not null default now()\n);\n\ncreate index if not exists entry_events_issuer_idx on entry_events (issuer);\ncreate index if not exists entry_events_end_idx on entry_events (end_date);\n\ncreate table if not exists collect_state (\n  id integer primary key,\n  collected_at timestamptz not null,\n  report text not null\n);\n";
 var _0003_pharma_default = "create table if not exists pharma_events (\n  id text primary key,\n  company_id text not null,\n  title text not null,\n  summary text not null,\n  kind text not null,\n  conditions text not null,\n  start_date date,\n  end_date date,\n  url text not null,\n  active boolean not null default true,\n  collected_at timestamptz not null default now()\n);\n\ncreate index if not exists pharma_events_company_idx on pharma_events (company_id);\n\ncreate table if not exists pharma_credentials (\n  company_id text primary key,\n  username text not null,\n  password_enc text not null,\n  updated_at timestamptz not null default now()\n);\n\ncreate table if not exists pharma_secret (\n  id integer primary key,\n  key text not null\n);\n\ncreate table if not exists pharma_state (\n  id integer primary key,\n  collected_at timestamptz not null,\n  cursor integer not null default 0,\n  report text not null\n);\n";
 var _0004_pharma_companies_default = "create table if not exists pharma_companies (\n  id text primary key,\n  name text not null,\n  short text not null,\n  login_url text not null,\n  position integer not null default 0\n);\n\ncreate table if not exists pharma_seed (\n  id integer primary key\n);\n\ndelete from pharma_credentials\nwhere company_id in ('baekje', 'boksan', 'geoyoung', 'sehwa', 'samwon', 'pico');\n\ndelete from pharma_events\nwhere company_id in ('baekje', 'boksan', 'geoyoung', 'sehwa', 'samwon', 'pico');\n";
+var _0005_event_entry_default = "alter table entry_events add column if not exists entry boolean not null default true;\n";
 /**
 * Migration bookkeeping shared by the two appliers — `scripts/migrate.mjs`
 * (deploy, `readdir`) and `src/lib/db.ts` (PGLite preview, `import.meta.glob`).
@@ -122,7 +123,8 @@ async function createPgliteSql() {
 		const migrations = /* #__PURE__ */ Object.assign({
 			"/migrations/0002_events.sql": _0002_events_default,
 			"/migrations/0003_pharma.sql": _0003_pharma_default,
-			"/migrations/0004_pharma_companies.sql": _0004_pharma_companies_default
+			"/migrations/0004_pharma_companies.sql": _0004_pharma_companies_default,
+			"/migrations/0005_event_entry.sql": _0005_event_entry_default
 		});
 		const done = (await pg.query("select name from _migrations")).rows.map((r) => r.name);
 		for (const { name, path } of pendingMigrations(Object.keys(migrations), done)) await pg.transaction(async (tx) => {

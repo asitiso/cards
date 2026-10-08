@@ -1,5 +1,5 @@
-import { a as mapPool, c as splitRules, d as ymd, i as isOngoing, l as stripTags, n as getSql, o as parseRange, r as isEntryCopy, s as seoulToday, t as fetchText, u as visibleMarkup } from "./html-BxjaJV6T.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/store.server-qWZeByN8.js
+import { a as mapPool, c as splitRules, d as ymd, i as isOngoing, l as stripTags, n as getSql, o as parseRange, r as isEntryCopy, s as seoulToday, t as fetchText, u as visibleMarkup } from "./html-C1SEj9i4.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/store.server-pWiFdhOL.js
 var MARKETS = [
 	{
 		id: "card",
@@ -301,20 +301,21 @@ function issuerMeta(id) {
 	return found;
 }
 var ENTRY = /응모|쿠폰|추첨|이벤트\s*신청|신청\s*필수|신청하기|참여\s*신청/;
-function eventOf(issuer, externalId, title, summary, startDate, endDate, applyUrl) {
-	const line = summary || "회사 화면에서 응모·쿠폰·추첨 조건을 확인하세요.";
+function eventOf(issuer, externalId, title, summary, startDate, endDate, applyUrl, entry = true) {
+	const line = summary || (entry ? "회사 화면에서 응모·쿠폰·추첨 조건을 확인하세요." : "회사 화면에서 조건을 확인하세요.");
 	return {
 		id: `${issuer}:${externalId}`,
 		issuer,
 		title,
 		summary: line,
-		benefit: "응모·쿠폰·추첨",
+		benefit: entry ? "응모·쿠폰·추첨" : "자동 적용·안내",
 		conditions: [line],
 		exclusions: [],
 		startDate,
 		endDate,
 		applyUrl,
-		listUrl: issuerMeta(issuer).listUrl
+		listUrl: issuerMeta(issuer).listUrl,
+		entry
 	};
 }
 function dateRange(value) {
@@ -352,13 +353,13 @@ function clue(text, title, blurb = "") {
 }
 async function keepIfEntry(issuer, externalId, title, blurb, start, end, applyUrl) {
 	const preview = `${title} ${blurb}`;
-	if (isEntry(preview)) return eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl);
+	if (isEntry(preview)) return eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl, true);
 	try {
 		const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8e3));
-		if (!isEntry(text)) return null;
-		return eventOf(issuer, externalId, title, clue(text, title, blurb), start, end, applyUrl);
+		const entry = isEntry(text);
+		return eventOf(issuer, externalId, title, entry ? clue(text, title, blurb) : tidy(blurb) || title, start, end, applyUrl, entry);
 	} catch {
-		return null;
+		return eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, false);
 	}
 }
 async function collectMirae(today) {
@@ -491,8 +492,8 @@ async function collectKbSec(today) {
 			try {
 				const text = pageText(await fetchText(row.applyUrl, {}, 8e3));
 				const range = periodRange(text);
-				if (!isEntry(text) || !range || !isOngoing(range.end, today) || range.start > today) return null;
-				return eventOf(issuer, row.id, row.title, clue(text, row.title), range.start, range.end, row.applyUrl);
+				if (!range || !isOngoing(range.end, today) || range.start > today) return null;
+				return eventOf(issuer, row.id, row.title, clue(text, row.title), range.start, range.end, row.applyUrl, isEntry(text));
 			} catch {
 				return null;
 			}
@@ -570,7 +571,7 @@ async function collectWooriBank(today) {
 		}
 		const events = (await mapPool(rows, 2, async (row) => {
 			const applyUrl = listUrl;
-			if (isEntry(`${row.title} ${row.summary}`)) return eventOf(issuer, row.id, row.title, row.summary || row.title, row.start, row.end, applyUrl);
+			if (isEntry(`${row.title} ${row.summary}`)) return eventOf(issuer, row.id, row.title, row.summary || row.title, row.start, row.end, applyUrl, true);
 			try {
 				const text = pageText(await fetchText("https://spot.wooribank.com/pot/Dream?withyou=EVEVT0001&cc=c001308:c001386", {
 					method: "POST",
@@ -580,10 +581,10 @@ async function collectWooriBank(today) {
 					},
 					body: `NO=${row.id}`
 				}, 8e3));
-				if (!isEntry(`${row.title} ${row.summary} ${text}`)) return null;
-				return eventOf(issuer, row.id, row.title, clue(text, row.summary || row.title), row.start, row.end, applyUrl);
+				const entry = isEntry(`${row.title} ${row.summary} ${text}`);
+				return eventOf(issuer, row.id, row.title, entry ? clue(text, row.summary || row.title) : row.summary || row.title, row.start, row.end, applyUrl, entry);
 			} catch {
-				return null;
+				return eventOf(issuer, row.id, row.title, row.summary || row.title, row.start, row.end, applyUrl, false);
 			}
 		})).filter((event) => event !== null);
 		return {
@@ -610,7 +611,7 @@ function genericEvents(issuer, html, today) {
 		const href = match[1];
 		if (/javascript:|^#|로그인|메뉴/.test(href)) continue;
 		const text = stripTags(match[2]).replace(/\s+/g, " ").trim();
-		if (text.length < 8 || text.length > 80 || !ENTRY.test(text)) continue;
+		if (text.length < 8 || text.length > 80) continue;
 		let applyUrl;
 		try {
 			applyUrl = new URL(href, listUrl).href;
@@ -622,7 +623,7 @@ function genericEvents(issuer, html, today) {
 		const range = dateRange(stripTags(around));
 		if (!range || !isOngoing(range.end, today)) continue;
 		seen.add(applyUrl);
-		events.push(eventOf(issuer, String(seen.size), text, text, range.start, range.end, applyUrl));
+		events.push(eventOf(issuer, String(seen.size), text, text, range.start, range.end, applyUrl, ENTRY.test(text)));
 		if (events.length >= 12) break;
 	}
 	return events;
@@ -698,11 +699,10 @@ async function collectShinhan(today) {
 			const applyUrl = new URL(row.item.hpgEvtDlPgeUrlAr, "https://www.shinhancard.com").href;
 			try {
 				const html = await fetchText(applyUrl);
-				if (!html.includes("응모하기")) return null;
 				const summaryRaw = stripTags(html.match(/class="evt-visual__summary"\s*>([\s\S]*?)<\/div>/)?.[1] ?? "");
 				const detailStart = html.indexOf("evt-detail");
 				const detail = stripTags(html.slice(detailStart, detailStart + 14e3));
-				if (!isEntryCopy(`${summaryRaw}\n${detail}\n응모하기`)) return null;
+				const entry = html.includes("응모하기") && isEntryCopy(`${summaryRaw}\n${detail}\n응모하기`);
 				const rules = splitRules(detail);
 				const summary = cleanSummary(row.item.mobWbEvtNm, summaryRaw, rules.conditions);
 				return eventBase(issuer, row.item.mobWbEvtRvN, {
@@ -713,7 +713,8 @@ async function collectShinhan(today) {
 					exclusions: rules.exclusions,
 					startDate: row.start,
 					endDate: row.end,
-					applyUrl
+					applyUrl,
+					entry
 				});
 			} catch {
 				return null;
@@ -753,7 +754,6 @@ async function collectHyundai(today) {
 				const start = page.indexOf("class=\"event_content\"");
 				const chunk = visibleMarkup(start >= 0 ? page.slice(start, start + 9e3) : "");
 				const text = stripTags(chunk);
-				if (!isEntryCopy(text)) return null;
 				const rules = splitRules(text);
 				const summary = cleanSummary(card.title, text.split("\n").find((line) => line.length > 12) ?? "", rules.conditions);
 				return eventBase(issuer, card.code, {
@@ -764,7 +764,8 @@ async function collectHyundai(today) {
 					exclusions: rules.exclusions,
 					startDate: card.range.start,
 					endDate: card.range.end,
-					applyUrl: card.applyUrl
+					applyUrl: card.applyUrl,
+					entry: isEntryCopy(text)
 				});
 			} catch {
 				return null;
@@ -812,8 +813,7 @@ async function collectKb(today) {
 				const visible = visibleMarkup(page);
 				const start = visible.indexOf("eventViewWrap");
 				const text = stripTags(visible.slice(start >= 0 ? start : 0, (start >= 0 ? start : 0) + 7e3));
-				if (!/응모하고|응모하기|응모\s*필수|응모\s*후/.test(text)) return null;
-				if (/무이자/.test(card.title) && !/응모하고|응모하기/.test(text)) return null;
+				const entry = /응모하고|응모하기|응모\s*필수|응모\s*후/.test(text);
 				const rules = splitRules(text);
 				const summary = cleanSummary(card.title, "", rules.conditions);
 				return eventBase(issuer, card.id, {
@@ -824,7 +824,8 @@ async function collectKb(today) {
 					exclusions: rules.exclusions,
 					startDate: card.range.start,
 					endDate: card.range.end,
-					applyUrl
+					applyUrl,
+					entry
 				});
 			} catch {
 				return null;
@@ -947,8 +948,8 @@ async function collectSamsung(today) {
 				if (!path.startsWith("/")) return null;
 				const html = await fetchText(new URL(path, "https://static11.samsungcard.com").href, { headers: { Referer: referer } });
 				const text = stripTags(visibleMarkup(html));
-				if (!(vo?.cmpSimpEntrYn === "Y") && !isEntryCopy(text)) return null;
-				const packed = rulesOr(card.title, text, "삼성카드 이벤트 페이지에서 응모 버튼으로 신청합니다.");
+				const simple = vo?.cmpSimpEntrYn === "Y";
+				const packed = rulesOr(card.title, text, "삼성카드 이벤트 페이지에서 조건을 확인하세요.");
 				return eventBase(issuer, card.cmsId, {
 					title: (vo?.cmpTitNm || card.title).replace(/\s+/g, " ").trim(),
 					summary: packed.summary,
@@ -957,7 +958,8 @@ async function collectSamsung(today) {
 					exclusions: packed.exclusions,
 					startDate: card.start || today,
 					endDate: card.end,
-					applyUrl: `https://www.samsungcard.com/personal/event/ing/UHPPBE1403M0.jsp?cms_id=${card.cmsId}`
+					applyUrl: `https://www.samsungcard.com/personal/event/ing/UHPPBE1403M0.jsp?cms_id=${card.cmsId}`,
+					entry: simple || isEntryCopy(text)
 				});
 			} catch {
 				return null;
@@ -1016,8 +1018,7 @@ async function collectLotte(today) {
 				const page = await fetchText(applyUrl, { headers: { Referer: listUrl } });
 				const start = page.indexOf("class=\"eventDetail\"");
 				const text = stripTags(visibleMarkup(start >= 0 ? page.slice(start, start + 14e3) : ""));
-				if (!isEntryCopy(text)) return null;
-				const packed = rulesOr(card.title, text, "롯데카드 이벤트 화면에서 응모합니다.");
+				const packed = rulesOr(card.title, text, "롯데카드 이벤트 화면에서 조건을 확인하세요.");
 				return eventBase(issuer, card.id, {
 					title: card.title,
 					summary: packed.summary,
@@ -1026,7 +1027,8 @@ async function collectLotte(today) {
 					exclusions: packed.exclusions,
 					startDate: card.start,
 					endDate: card.end,
-					applyUrl
+					applyUrl,
+					entry: isEntryCopy(text)
 				});
 			} catch {
 				return null;
@@ -1055,7 +1057,6 @@ async function collectHana(today) {
 			const range = parseRange(stripTags(match[4]));
 			const title = stripTags(match[3]).replace(/\s+/g, " ");
 			if (!range || range.start > today) return null;
-			if (/무이자/.test(title) && !/응모/.test(title)) return null;
 			return {
 				id: match[2],
 				path: match[1],
@@ -1071,8 +1072,7 @@ async function collectHana(today) {
 			try {
 				const sections = [...(await fetchText(applyUrl, { headers: { Referer: listUrl } })).matchAll(/<section class="eVgroup[\s\S]*?<\/section>/g)].map((match) => match[0]).join("\n");
 				const text = stripTags(visibleMarkup(sections));
-				if (!isEntryCopy(text)) return null;
-				const packed = rulesOr(card.title, text, "하나카드 이벤트 화면에서 응모합니다.");
+				const packed = rulesOr(card.title, text, "하나카드 이벤트 화면에서 조건을 확인하세요.");
 				return eventBase(issuer, card.id, {
 					title: card.title,
 					summary: packed.summary,
@@ -1081,7 +1081,8 @@ async function collectHana(today) {
 					exclusions: packed.exclusions,
 					startDate: card.start,
 					endDate: card.end,
-					applyUrl
+					applyUrl,
+					entry: isEntryCopy(text) || /응모/.test(card.title)
 				});
 			} catch {
 				return null;
@@ -1148,7 +1149,8 @@ async function collectNh(today) {
 				exclusions: packed.exclusions.length ? packed.exclusions : ["자세한 제외 업종은 카드사 안내 이미지를 확인하세요."],
 				startDate: card.start,
 				endDate: card.end,
-				applyUrl
+				applyUrl,
+				entry: isEntryCopy(`${text}\n${card.title}`) || /응모/.test(card.title)
 			});
 		})).filter((event) => event !== null);
 		return {
@@ -1191,14 +1193,12 @@ async function collectBc(today) {
 			const typed = PAYBOOC_ENTRY.has(item.pybcUnifEvntTypCd || "");
 			const tagged = /마이태그|응모/.test(title);
 			if (!item.pybcUnifEvntNo || !end || item.endEvent || start > today) return null;
-			if (!typed && !tagged) return null;
-			if (/무이자|할부/.test(title) && !typed && !/응모/.test(title)) return null;
 			return {
 				id: item.pybcUnifEvntNo,
 				title,
 				start,
 				end,
-				typed
+				typed: typed || tagged
 			};
 		}).filter((row) => row !== null), today, 16);
 		const events = (await mapPool(chosen, 4, async (card) => {
@@ -1232,8 +1232,7 @@ async function collectBc(today) {
 				}
 				const text = `${groups}\n${notice}`;
 				const mytag = /마이태그/.test(card.title);
-				if (!card.typed && !mytag && !isEntryCopy(`${text}\n${card.title}`)) return null;
-				const packed = rulesOr(card.title, text, card.typed ? "페이북이 로그인·비로그인 응모형으로 분류한 이벤트입니다." : "페이북 마이태그(응모) 이벤트입니다. 태그와 결제 조건은 카드사 화면에서 확인하세요.");
+				const packed = rulesOr(card.title, text, card.typed ? "페이북이 로그인·비로그인 응모형으로 분류한 이벤트입니다." : "페이북 이벤트입니다. 조건은 카드사 화면에서 확인하세요.");
 				return eventBase(issuer, card.id, {
 					title: card.title,
 					summary: packed.summary,
@@ -1242,19 +1241,20 @@ async function collectBc(today) {
 					exclusions: packed.exclusions,
 					startDate: card.start || today,
 					endDate: card.end,
-					applyUrl
+					applyUrl,
+					entry: card.typed || mytag || isEntryCopy(`${text}\n${card.title}`)
 				});
 			} catch {
-				if (!card.typed) return null;
 				return eventBase(issuer, card.id, {
 					title: card.title,
 					summary: card.title,
 					benefit: card.title.slice(0, 80),
-					conditions: ["페이북이 응모형으로 분류한 이벤트입니다. 대상과 제외 조건은 응모 화면에서 확인하세요."],
+					conditions: ["대상과 제외 조건은 행사 화면에서 확인하세요."],
 					exclusions: [],
 					startDate: card.start || today,
 					endDate: card.end,
-					applyUrl
+					applyUrl,
+					entry: card.typed
 				});
 			}
 		})).filter((event) => event !== null);
@@ -1281,8 +1281,6 @@ async function collectIbk(today) {
 			const range = parseRange(stripTags(match[3]));
 			const title = stripTags(match[2]).replace(/\s+/g, " ");
 			if (!range || range.start > today) return null;
-			if (!/카드|응모/.test(title)) return null;
-			if (/무이자/.test(title) && !/응모/.test(title)) return null;
 			return {
 				id: match[1],
 				title,
@@ -1296,8 +1294,8 @@ async function collectIbk(today) {
 			const applyUrl = `https://www.ibk.co.kr/event/ingDetailEvent.ibk?evnt_srno=${card.id}&evnt_dscd=H&pageId=CM01060100`;
 			try {
 				const text = [...(await fetchText(applyUrl, { headers: { Referer: listUrl } })).matchAll(/<img[^>]*alt="([^"]{20,500})"[^>]*>/g)].map((match) => stripTags(match[1]).replace(/[·•]/g, "\n")).filter((alt) => !/기업은행 로고|이전|다음/.test(alt)).join("\n");
-				if (!/신청하기|응모하기|사전 신청|쿠폰\s*다운로드|이벤트\s*응모/.test(text)) return null;
-				const packed = rulesOr(card.title, text, "IBK 카드 행사 화면에서 신청 또는 쿠폰을 받아야 혜택이 적용됩니다.");
+				const entry = /신청하기|응모하기|사전 신청|쿠폰\s*다운로드|이벤트\s*응모/.test(text);
+				const packed = rulesOr(card.title, text, "IBK 행사 화면에서 조건을 확인하세요.");
 				return eventBase(issuer, card.id, {
 					title: card.title,
 					summary: packed.summary,
@@ -1306,7 +1304,8 @@ async function collectIbk(today) {
 					exclusions: packed.exclusions,
 					startDate: card.start,
 					endDate: card.end,
-					applyUrl
+					applyUrl,
+					entry
 				});
 			} catch {
 				return null;
@@ -2462,7 +2461,8 @@ function toEvent(row) {
 		startDate: row.start_date,
 		endDate: row.end_date,
 		applyUrl: row.apply_url,
-		listUrl: row.list_url
+		listUrl: row.list_url,
+		entry: row.entry !== false
 	};
 }
 function fullReport(partial, counts) {
@@ -2492,12 +2492,12 @@ async function insertEvents(events, collectedAt) {
 	for (const event of events) await sql`
       insert into entry_events (
         id, issuer, title, summary, benefit, conditions, exclusions,
-        start_date, end_date, apply_url, list_url, active, collected_at
+        start_date, end_date, apply_url, list_url, active, collected_at, entry
       ) values (
         ${event.id}, ${event.issuer}, ${event.title}, ${event.summary}, ${event.benefit},
         ${JSON.stringify(event.conditions)}, ${JSON.stringify(event.exclusions)},
         ${event.startDate}, ${event.endDate}, ${event.applyUrl}, ${event.listUrl},
-        true, ${collectedAt}
+        true, ${collectedAt}, ${event.entry !== false}
       )
       on conflict (id) do nothing
     `;
@@ -2544,7 +2544,7 @@ async function readBoard() {
 	const rows = await sql`
     select id, issuer, title, summary, benefit, conditions, exclusions,
            start_date::text as start_date, end_date::text as end_date,
-           apply_url, list_url
+           apply_url, list_url, entry
     from entry_events
     where active = true
     order by end_date asc, title asc
@@ -2584,12 +2584,12 @@ async function refreshBoard() {
 		for (const event of hit.events) await sql`
         insert into entry_events (
           id, issuer, title, summary, benefit, conditions, exclusions,
-          start_date, end_date, apply_url, list_url, active, collected_at
+          start_date, end_date, apply_url, list_url, active, collected_at, entry
         ) values (
           ${event.id}, ${event.issuer}, ${event.title}, ${event.summary}, ${event.benefit},
           ${JSON.stringify(event.conditions)}, ${JSON.stringify(event.exclusions)},
           ${event.startDate}, ${event.endDate}, ${event.applyUrl}, ${event.listUrl},
-          true, ${collectedAt}
+          true, ${collectedAt}, ${event.entry !== false}
         )
         on conflict (id) do update set
           title = excluded.title,
@@ -2602,7 +2602,8 @@ async function refreshBoard() {
           apply_url = excluded.apply_url,
           list_url = excluded.list_url,
           active = true,
-          collected_at = excluded.collected_at
+          collected_at = excluded.collected_at,
+          entry = excluded.entry
       `;
 	}
 	const previous = await sql`select report from collect_state where id = 1`;

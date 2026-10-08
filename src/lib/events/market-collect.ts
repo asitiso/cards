@@ -12,20 +12,22 @@ function eventOf(
   startDate: string,
   endDate: string,
   applyUrl: string,
+  entry = true,
 ): EntryEvent {
-  const line = summary || "회사 화면에서 응모·쿠폰·추첨 조건을 확인하세요.";
+  const line = summary || (entry ? "회사 화면에서 응모·쿠폰·추첨 조건을 확인하세요." : "회사 화면에서 조건을 확인하세요.");
   return {
     id: `${issuer}:${externalId}`,
     issuer,
     title,
     summary: line,
-    benefit: "응모·쿠폰·추첨",
+    benefit: entry ? "응모·쿠폰·추첨" : "자동 적용·안내",
     conditions: [line],
     exclusions: [],
     startDate,
     endDate,
     applyUrl,
     listUrl: issuerMeta(issuer).listUrl,
+    entry,
   };
 }
 
@@ -86,15 +88,24 @@ async function keepIfEntry(
   start: string,
   end: string,
   applyUrl: string,
-): Promise<EntryEvent | null> {
+): Promise<EntryEvent> {
   const preview = `${title} ${blurb}`;
-  if (isEntry(preview)) return eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl);
+  if (isEntry(preview)) return eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl, true);
   try {
     const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8000));
-    if (!isEntry(text)) return null;
-    return eventOf(issuer, externalId, title, clue(text, title, blurb), start, end, applyUrl);
+    const entry = isEntry(text);
+    return eventOf(
+      issuer,
+      externalId,
+      title,
+      entry ? clue(text, title, blurb) : tidy(blurb) || title,
+      start,
+      end,
+      applyUrl,
+      entry,
+    );
   } catch {
-    return null;
+    return eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, false);
   }
 }
 
@@ -280,8 +291,8 @@ async function collectKbSec(today: string): Promise<CollectHit> {
         try {
           const text = pageText(await fetchText(row.applyUrl, {}, 8000));
           const range = periodRange(text);
-          if (!isEntry(text) || !range || !isOngoing(range.end, today) || range.start > today) return null;
-          return eventOf(issuer, row.id, row.title, clue(text, row.title), range.start, range.end, row.applyUrl);
+          if (!range || !isOngoing(range.end, today) || range.start > today) return null;
+          return eventOf(issuer, row.id, row.title, clue(text, row.title), range.start, range.end, row.applyUrl, isEntry(text));
         } catch {
           return null;
         }
@@ -374,8 +385,9 @@ async function collectWooriBank(today: string): Promise<CollectHit> {
     const events = (
       await mapPool(rows, 2, async (row) => {
         const applyUrl = listUrl;
-        if (isEntry(`${row.title} ${row.summary}`)) {
-          return eventOf(issuer, row.id, row.title, row.summary || row.title, row.start, row.end, applyUrl);
+        const listed = isEntry(`${row.title} ${row.summary}`);
+        if (listed) {
+          return eventOf(issuer, row.id, row.title, row.summary || row.title, row.start, row.end, applyUrl, true);
         }
         try {
           const text = pageText(
@@ -389,10 +401,19 @@ async function collectWooriBank(today: string): Promise<CollectHit> {
               8000,
             ),
           );
-          if (!isEntry(`${row.title} ${row.summary} ${text}`)) return null;
-          return eventOf(issuer, row.id, row.title, clue(text, row.summary || row.title), row.start, row.end, applyUrl);
+          const entry = isEntry(`${row.title} ${row.summary} ${text}`);
+          return eventOf(
+            issuer,
+            row.id,
+            row.title,
+            entry ? clue(text, row.summary || row.title) : row.summary || row.title,
+            row.start,
+            row.end,
+            applyUrl,
+            entry,
+          );
         } catch {
-          return null;
+          return eventOf(issuer, row.id, row.title, row.summary || row.title, row.start, row.end, applyUrl, false);
         }
       })
     ).filter((event): event is EntryEvent => event !== null);
@@ -423,7 +444,7 @@ function genericEvents(issuer: IssuerId, html: string, today: string): EntryEven
     const href = match[1];
     if (/javascript:|^#|로그인|메뉴/.test(href)) continue;
     const text = stripTags(match[2]).replace(/\s+/g, " ").trim();
-    if (text.length < 8 || text.length > 80 || !ENTRY.test(text)) continue;
+    if (text.length < 8 || text.length > 80) continue;
     let applyUrl: string;
     try {
       applyUrl = new URL(href, listUrl).href;
@@ -435,7 +456,7 @@ function genericEvents(issuer: IssuerId, html: string, today: string): EntryEven
     const range = dateRange(stripTags(around));
     if (!range || !isOngoing(range.end, today)) continue;
     seen.add(applyUrl);
-    events.push(eventOf(issuer, String(seen.size), text, text, range.start, range.end, applyUrl));
+    events.push(eventOf(issuer, String(seen.size), text, text, range.start, range.end, applyUrl, ENTRY.test(text)));
     if (events.length >= 12) break;
   }
   return events;

@@ -23,6 +23,7 @@ type EventRow = {
   end_date: string;
   apply_url: string;
   list_url: string;
+  entry: boolean;
 };
 
 const QUIET: Record<string, string> = {
@@ -58,6 +59,7 @@ function toEvent(row: EventRow): EntryEvent {
     endDate: row.end_date,
     applyUrl: row.apply_url,
     listUrl: row.list_url,
+    entry: row.entry !== false,
   };
 }
 
@@ -95,12 +97,12 @@ async function insertEvents(events: EntryEvent[], collectedAt: string): Promise<
     await sql`
       insert into entry_events (
         id, issuer, title, summary, benefit, conditions, exclusions,
-        start_date, end_date, apply_url, list_url, active, collected_at
+        start_date, end_date, apply_url, list_url, active, collected_at, entry
       ) values (
         ${event.id}, ${event.issuer}, ${event.title}, ${event.summary}, ${event.benefit},
         ${JSON.stringify(event.conditions)}, ${JSON.stringify(event.exclusions)},
         ${event.startDate}, ${event.endDate}, ${event.applyUrl}, ${event.listUrl},
-        true, ${collectedAt}
+        true, ${collectedAt}, ${event.entry !== false}
       )
       on conflict (id) do nothing
     `;
@@ -159,7 +161,7 @@ async function readBoard(): Promise<Board> {
   const rows = await sql<EventRow>`
     select id, issuer, title, summary, benefit, conditions, exclusions,
            start_date::text as start_date, end_date::text as end_date,
-           apply_url, list_url
+           apply_url, list_url, entry
     from entry_events
     where active = true
     order by end_date asc, title asc
@@ -203,12 +205,12 @@ export async function refreshBoard(): Promise<Board> {
       await sql`
         insert into entry_events (
           id, issuer, title, summary, benefit, conditions, exclusions,
-          start_date, end_date, apply_url, list_url, active, collected_at
+          start_date, end_date, apply_url, list_url, active, collected_at, entry
         ) values (
           ${event.id}, ${event.issuer}, ${event.title}, ${event.summary}, ${event.benefit},
           ${JSON.stringify(event.conditions)}, ${JSON.stringify(event.exclusions)},
           ${event.startDate}, ${event.endDate}, ${event.applyUrl}, ${event.listUrl},
-          true, ${collectedAt}
+          true, ${collectedAt}, ${event.entry !== false}
         )
         on conflict (id) do update set
           title = excluded.title,
@@ -221,7 +223,8 @@ export async function refreshBoard(): Promise<Board> {
           apply_url = excluded.apply_url,
           list_url = excluded.list_url,
           active = true,
-          collected_at = excluded.collected_at
+          collected_at = excluded.collected_at,
+          entry = excluded.entry
       `;
     }
   }

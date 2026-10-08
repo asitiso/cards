@@ -1,9 +1,9 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { b as require_jsx_runtime, q as require_react } from "../_libs/@tanstack/react-router+[...].mjs";
-import { n as MARKETS, r as issuerMeta, t as ISSUERS } from "./store.server-qWZeByN8.mjs";
+import { n as MARKETS, r as issuerMeta, t as ISSUERS } from "./store.server-pWiFdhOL.mjs";
 import { a as ArrowUpRight, i as ChevronDown, n as Search, r as RefreshCw } from "../_libs/lucide-react.mjs";
-import { a as reloadPharma, c as storePharmaLogin, i as editPharmaCompany, l as reloadBoard, n as Route$1, o as removePharmaCompany, r as createPharmaCompany, s as removePharmaLogin } from "./router-CQZ5jOrK.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-90ar-xEQ.js
+import { a as reloadPharma, c as storePharmaLogin, i as editPharmaCompany, l as reloadBoard, n as Route$1, o as removePharmaCompany, r as createPharmaCompany, s as removePharmaLogin } from "./router-GeL79zEJ.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-jB5TiIz4.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 /**
@@ -620,13 +620,15 @@ function Home() {
 	const [market, setMarket] = (0, import_react.useState)("card");
 	const [issuer, setIssuer] = (0, import_react.useState)("all");
 	const [sort, setSort] = (0, import_react.useState)("soon");
+	const [scope, setScope] = (0, import_react.useState)("all");
 	const [query, setQuery] = (0, import_react.useState)("");
 	const [openIds, setOpenIds] = (0, import_react.useState)([]);
 	const [pending, setPending] = (0, import_react.useState)(false);
 	const [error, setError] = (0, import_react.useState)("");
+	const scoped = (0, import_react.useMemo)(() => board.events.filter((event) => matchesScope(event, scope)), [board.events, scope]);
 	const visible = (0, import_react.useMemo)(() => {
 		const q = query.trim().toLowerCase();
-		return board.events.filter((event) => issuerMeta(event.issuer).market === market).filter((event) => issuer === "all" || event.issuer === issuer).filter((event) => {
+		return scoped.filter((event) => issuerMeta(event.issuer).market === market).filter((event) => issuer === "all" || event.issuer === issuer).filter((event) => {
 			if (!q) return true;
 			return [
 				event.title,
@@ -637,7 +639,7 @@ function Home() {
 			].join(" ").toLowerCase().includes(q);
 		}).sort((a, b) => sort === "new" ? b.startDate.localeCompare(a.startDate) || a.endDate.localeCompare(b.endDate) : a.endDate.localeCompare(b.endDate) || a.title.localeCompare(b.title, "ko"));
 	}, [
-		board.events,
+		scoped,
 		issuer,
 		market,
 		query,
@@ -700,7 +702,7 @@ function Home() {
 				role: "tablist",
 				"aria-label": "종류",
 				children: MARKETS.map((item) => {
-					const count = board.events.filter((event) => issuerMeta(event.issuer).market === item.id).length;
+					const count = scoped.filter((event) => issuerMeta(event.issuer).market === item.id).length;
 					const active = market === item.id;
 					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
 						type: "button",
@@ -717,6 +719,31 @@ function Home() {
 							count
 						]
 					}, item.id);
+				})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-2 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5",
+				role: "tablist",
+				"aria-label": "응모 여부",
+				children: [
+					["entry", "응모"],
+					["all", "전체"],
+					["other", "응모 아님"]
+				].map(([id, label]) => {
+					const active = scope === id;
+					const count = board.events.filter((event) => issuerMeta(event.issuer).market === market && matchesScope(event, id)).length;
+					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						role: "tab",
+						"aria-selected": active,
+						onClick: () => setScope(id),
+						className: active ? "h-8 rounded-full bg-ink text-xs font-medium text-paper" : "h-8 rounded-full text-xs text-muted",
+						children: [
+							label,
+							" ",
+							count
+						]
+					}, id);
 				})
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
@@ -759,9 +786,9 @@ function Home() {
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Chip, {
 					active: issuer === "all",
 					onClick: () => setIssuer("all"),
-					children: ["전체 ", board.events.filter((event) => issuerMeta(event.issuer).market === market).length]
+					children: ["전체 ", scoped.filter((event) => issuerMeta(event.issuer).market === market).length]
 				}), ISSUERS.filter((item) => item.market === market).map((item) => {
-					const count = board.events.filter((event) => event.issuer === item.id).length;
+					const count = scoped.filter((event) => event.issuer === item.id).length;
 					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Chip, {
 						active: issuer === item.id,
 						onClick: () => setIssuer(item.id),
@@ -779,7 +806,7 @@ function Home() {
 			}),
 			visible.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 				className: "mt-2 rounded-2xl border border-dashed border-line bg-card px-4 py-6 text-center text-sm text-muted",
-				children: "이 종류에서 응모·쿠폰·추첨 이벤트가 없습니다. 아래 회사 앱에서 확인하세요."
+				children: scope === "entry" ? "이 종류에서 응모 이벤트가 없습니다." : scope === "other" ? "이 종류에서 응모가 아닌 이벤트가 없습니다." : "이 종류에서 이벤트가 없습니다. 다시 수집하면 전체 행사를 가져옵니다."
 			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
 				className: "mt-1.5 overflow-hidden rounded-2xl border border-line bg-card",
 				children: visible.map((event) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EventRow, {
@@ -853,7 +880,7 @@ function EventRow({ event, today, open, onToggle }) {
 							target: "_blank",
 							rel: "noreferrer",
 							className: "ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink",
-							children: ["응모", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
+							children: [event.entry === false ? "보기" : "응모", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
 						})
 					]
 				}),
@@ -917,7 +944,7 @@ function EventRow({ event, today, open, onToggle }) {
 					target: "_blank",
 					rel: "noreferrer",
 					className: "mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink",
-					children: ["응모", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
+					children: [event.entry === false ? "보기" : "응모", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
 				})]
 			}), open ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 				className: "border-t border-line",
@@ -959,7 +986,7 @@ function EventBody({ event, id }) {
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
 				className: "mt-2 text-sm font-semibold",
-				children: "응모 조건"
+				children: event.entry === false ? "안내" : "응모 조건"
 			}),
 			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
 				className: "mt-1 list-disc space-y-0.5 pl-5 text-sm leading-relaxed text-muted",
@@ -979,7 +1006,8 @@ function EventBody({ event, id }) {
 				className: "mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto",
 				children: [
 					issuerName(event.issuer),
-					"에서 응모",
+					"에서 ",
+					event.entry === false ? "보기" : "응모",
 					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-4" })
 				]
 			})
@@ -1009,6 +1037,12 @@ function Deadline({ end, today }) {
 		className: days >= 0 && days <= 7 ? "inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium tabular-nums text-accent-ink" : "inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-full bg-paper px-1 text-[10px] font-medium tabular-nums text-muted",
 		children: label
 	});
+}
+function matchesScope(event, scope) {
+	const entry = event.entry !== false;
+	if (scope === "entry") return entry;
+	if (scope === "other") return !entry;
+	return true;
 }
 function issuerName(id) {
 	return ISSUERS.find((item) => item.id === id)?.name ?? id;
