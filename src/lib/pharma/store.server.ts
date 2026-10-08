@@ -1,4 +1,4 @@
-import { getSql } from "@/lib/db";
+import { dbSource, getSql } from "@/lib/db";
 import { mapPool, seoulToday } from "@/lib/events/html";
 import { SEED_COMPANIES, chipLabel, type PharmaCompany } from "./companies.ts";
 import { collectCompany, describeLogin } from "./collect.ts";
@@ -105,6 +105,25 @@ async function getCompany(id: string): Promise<PharmaCompany | undefined> {
   return (await listCompanies()).find((company) => company.id === id);
 }
 
+function bundledPharmaBoard(): PharmaBoard {
+  return {
+    collectedAt: "",
+    today: seoulToday(),
+    events: [],
+    companies: SEED_COMPANIES.map((company) => ({
+      id: company.id,
+      name: company.name,
+      short: company.short,
+      loginUrl: company.loginUrl,
+      count: 0,
+      ok: false,
+      saved: false,
+      username: "",
+      message: "아이디를 저장하면 응모·할인·신제품을 읽습니다.",
+    })),
+  };
+}
+
 async function readReport(): Promise<ReportRow[]> {
   const sql = await getSql();
   const state = await sql<{ report: string }>`select report from pharma_state where id = 1`;
@@ -117,6 +136,7 @@ async function readReport(): Promise<ReportRow[]> {
 }
 
 export async function loadPharmaBoard(): Promise<PharmaBoard> {
+  if (dbSource === "pglite") return bundledPharmaBoard();
   const sql = await getSql();
   const today = seoulToday();
   const catalog = await listCompanies();

@@ -1,6 +1,6 @@
-import { a as mapPool, i as isOngoing, l as stripTags, n as getSql, o as parseRange, s as seoulToday, u as visibleMarkup } from "./html-C1SEj9i4.mjs";
+import { a as isOngoing, c as seoulToday, d as visibleMarkup, o as mapPool, r as getSql, s as parseRange, t as dbSource, u as stripTags } from "./html-u6NTOPkv.mjs";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-//#region node_modules/.nitro/vite/services/ssr/assets/store.server-vukVhSGt.js
+//#region node_modules/.nitro/vite/services/ssr/assets/store.server-DHV2THhb.js
 /** Bookmark list without the wholesale folder. 바로팜만 남겼다. */
 var SEED_COMPANIES = [
 	{
@@ -858,6 +858,24 @@ function cleanCompany(name, loginUrl) {
 async function getCompany(id) {
 	return (await listCompanies()).find((company) => company.id === id);
 }
+function bundledPharmaBoard() {
+	return {
+		collectedAt: "",
+		today: seoulToday(),
+		events: [],
+		companies: SEED_COMPANIES.map((company) => ({
+			id: company.id,
+			name: company.name,
+			short: company.short,
+			loginUrl: company.loginUrl,
+			count: 0,
+			ok: false,
+			saved: false,
+			username: "",
+			message: "아이디를 저장하면 응모·할인·신제품을 읽습니다."
+		}))
+	};
+}
 async function readReport() {
 	const state = await (await getSql())`select report from pharma_state where id = 1`;
 	try {
@@ -868,6 +886,7 @@ async function readReport() {
 	}
 }
 async function loadPharmaBoard() {
+	if (dbSource === "pglite") return bundledPharmaBoard();
 	const sql = await getSql();
 	const today = seoulToday();
 	const catalog = await listCompanies();

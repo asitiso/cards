@@ -1,5 +1,5 @@
-import { a as mapPool, c as splitRules, d as ymd, i as isOngoing, l as stripTags, n as getSql, o as parseRange, r as isEntryCopy, s as seoulToday, t as fetchText, u as visibleMarkup } from "./html-C1SEj9i4.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/store.server-pWiFdhOL.js
+import { a as isOngoing, c as seoulToday, d as visibleMarkup, f as ymd, i as isEntryCopy, l as splitRules, n as fetchText, o as mapPool, r as getSql, s as parseRange, t as dbSource, u as stripTags } from "./html-u6NTOPkv.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/store.server-CTaNKmrY.js
 var MARKETS = [
 	{
 		id: "card",
@@ -2568,7 +2568,26 @@ async function readBoard() {
 		issuers: fullReport(partial, counts)
 	};
 }
+function bundledBoard() {
+	const events = [...SNAPSHOT_EVENTS];
+	const have = new Set(events.map((event) => event.issuer));
+	const reported = new Set(SNAPSHOT_REPORT.filter((item) => item.ok).map((item) => item.id));
+	const missingIssuers = new Set(EXTRA_EVENTS.map((event) => event.issuer).filter((issuer) => !have.has(issuer) && !reported.has(issuer)));
+	for (const event of EXTRA_EVENTS) if (missingIssuers.has(event.issuer)) events.push(event);
+	events.sort((a, b) => a.endDate.localeCompare(b.endDate) || a.title.localeCompare(b.title, "ko"));
+	const counts = /* @__PURE__ */ new Map();
+	for (const event of events) counts.set(event.issuer, (counts.get(event.issuer) ?? 0) + 1);
+	const partial = SNAPSHOT_REPORT.filter((item) => !missingIssuers.has(item.id));
+	for (const report of EXTRA_REPORT) if (missingIssuers.has(report.id)) partial.push(report);
+	return {
+		collectedAt: missingIssuers.size > 0 ? EXTRA_AT : SNAPSHOT_AT,
+		today: seoulToday(),
+		events,
+		issuers: fullReport(partial, counts)
+	};
+}
 async function loadBoard() {
+	if (dbSource === "pglite") return bundledBoard();
 	await seedIfEmpty();
 	await backfillExtra();
 	return readBoard();

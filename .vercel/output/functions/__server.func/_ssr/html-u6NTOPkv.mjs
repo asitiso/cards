@@ -1,4 +1,4 @@
-//#region node_modules/.nitro/vite/services/ssr/assets/html-C1SEj9i4.js
+//#region node_modules/.nitro/vite/services/ssr/assets/html-u6NTOPkv.js
 var _0002_events_default = "create table if not exists entry_events (\n  id text primary key,\n  issuer text not null,\n  title text not null,\n  summary text not null,\n  benefit text not null,\n  conditions text not null,\n  exclusions text not null,\n  start_date date,\n  end_date date,\n  apply_url text not null,\n  list_url text not null,\n  active boolean not null default true,\n  collected_at timestamptz not null default now()\n);\n\ncreate index if not exists entry_events_issuer_idx on entry_events (issuer);\ncreate index if not exists entry_events_end_idx on entry_events (end_date);\n\ncreate table if not exists collect_state (\n  id integer primary key,\n  collected_at timestamptz not null,\n  report text not null\n);\n";
 var _0003_pharma_default = "create table if not exists pharma_events (\n  id text primary key,\n  company_id text not null,\n  title text not null,\n  summary text not null,\n  kind text not null,\n  conditions text not null,\n  start_date date,\n  end_date date,\n  url text not null,\n  active boolean not null default true,\n  collected_at timestamptz not null default now()\n);\n\ncreate index if not exists pharma_events_company_idx on pharma_events (company_id);\n\ncreate table if not exists pharma_credentials (\n  company_id text primary key,\n  username text not null,\n  password_enc text not null,\n  updated_at timestamptz not null default now()\n);\n\ncreate table if not exists pharma_secret (\n  id integer primary key,\n  key text not null\n);\n\ncreate table if not exists pharma_state (\n  id integer primary key,\n  collected_at timestamptz not null,\n  cursor integer not null default 0,\n  report text not null\n);\n";
 var _0004_pharma_companies_default = "create table if not exists pharma_companies (\n  id text primary key,\n  name text not null,\n  short text not null,\n  login_url text not null,\n  position integer not null default 0\n);\n\ncreate table if not exists pharma_seed (\n  id integer primary key\n);\n\ndelete from pharma_credentials\nwhere company_id in ('baekje', 'boksan', 'geoyoung', 'sehwa', 'samwon', 'pico');\n\ndelete from pharma_events\nwhere company_id in ('baekje', 'boksan', 'geoyoung', 'sehwa', 'samwon', 'pico');\n";
@@ -158,26 +158,6 @@ function getSql() {
 	});
 	return sqlPromise;
 }
-/**
-* Finish DB bootstrap before the server handles traffic.
-*
-* - **PGLite** (preview / no `DATABASE_URL`): open the in-memory DB and apply
-*   `migrations/*.sql`. Idempotent — concurrent callers share one promise.
-* - **Neon**: no-op (pool is created lazily on first query).
-*
-* Vite `configureServer` awaits this at dev startup; production imports of this
-* module kick it off immediately (see bottom of file).
-*/
-function ensureDbReady() {
-	if (dbSource !== "pglite") return Promise.resolve();
-	return getSql().then(() => void 0);
-}
-var globalBoot = globalThis;
-if (typeof window === "undefined" && dbSource === "pglite") globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {
-	globalBoot.__pgBootstrapPromise__ = void 0;
-	console.error("[db] PGLite bootstrap failed:", err);
-	throw err;
-});
 function seoulToday(now = /* @__PURE__ */ new Date()) {
 	return new Intl.DateTimeFormat("en-CA", {
 		timeZone: "Asia/Seoul",
@@ -276,4 +256,4 @@ async function mapPool(items, size, task) {
 	return out;
 }
 //#endregion
-export { mapPool as a, splitRules as c, ymd as d, isOngoing as i, stripTags as l, getSql as n, parseRange as o, isEntryCopy as r, seoulToday as s, fetchText as t, visibleMarkup as u };
+export { isOngoing as a, seoulToday as c, visibleMarkup as d, ymd as f, isEntryCopy as i, splitRules as l, fetchText as n, mapPool as o, getSql as r, parseRange as s, dbSource as t, stripTags as u };

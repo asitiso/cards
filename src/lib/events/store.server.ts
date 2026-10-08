@@ -1,4 +1,4 @@
-import { getSql } from "@/lib/db";
+import { getSql, dbSource } from "@/lib/db";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
 import { SNAPSHOT_AT, SNAPSHOT_EVENTS, SNAPSHOT_REPORT } from "./snapshot.ts";
@@ -186,7 +186,33 @@ async function readBoard(): Promise<Board> {
   };
 }
 
+function bundledBoard(): Board {
+  const events = [...SNAPSHOT_EVENTS];
+  const have = new Set(events.map((event) => event.issuer));
+  const reported = new Set(SNAPSHOT_REPORT.filter((item) => item.ok).map((item) => item.id));
+  const missingIssuers = new Set(
+    EXTRA_EVENTS.map((event) => event.issuer).filter((issuer) => !have.has(issuer) && !reported.has(issuer)),
+  );
+  for (const event of EXTRA_EVENTS) {
+    if (missingIssuers.has(event.issuer)) events.push(event);
+  }
+  events.sort((a, b) => a.endDate.localeCompare(b.endDate) || a.title.localeCompare(b.title, "ko"));
+  const counts = new Map<string, number>();
+  for (const event of events) counts.set(event.issuer, (counts.get(event.issuer) ?? 0) + 1);
+  const partial = SNAPSHOT_REPORT.filter((item) => !missingIssuers.has(item.id));
+  for (const report of EXTRA_REPORT) {
+    if (missingIssuers.has(report.id)) partial.push(report);
+  }
+  return {
+    collectedAt: missingIssuers.size > 0 ? EXTRA_AT : SNAPSHOT_AT,
+    today: seoulToday(),
+    events,
+    issuers: fullReport(partial, counts),
+  };
+}
+
 export async function loadBoard(): Promise<Board> {
+  if (dbSource === "pglite") return bundledBoard();
   await seedIfEmpty();
   await backfillExtra();
   return readBoard();
