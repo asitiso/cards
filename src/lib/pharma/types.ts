@@ -1,3 +1,5 @@
+import type { ChangeRecord } from "@/lib/change-history/types";
+
 export type PharmaKind = "entry" | "sale" | "new";
 
 export type PharmaEvent = {
@@ -29,6 +31,7 @@ export type PharmaBoard = {
   today: string;
   events: PharmaEvent[];
   companies: PharmaCompanyReport[];
+  changes: ChangeRecord[];
 };
 
 export type PharmaBrowserLogin = {
