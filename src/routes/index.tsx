@@ -244,10 +244,6 @@ function EventRow({
             href={event.applyUrl}
             target="_blank"
             rel="noreferrer"
-            onClick={(click) => {
-              click.preventDefault();
-              openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
-            }}
             className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
             응모
@@ -302,10 +298,6 @@ function EventRow({
             href={event.applyUrl}
             target="_blank"
             rel="noreferrer"
-            onClick={(click) => {
-              click.preventDefault();
-              openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
-            }}
             className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
             응모
@@ -357,10 +349,6 @@ function EventBody({ event, id }: { event: EntryEvent; id: string }) {
         href={event.applyUrl}
         target="_blank"
         rel="noreferrer"
-        onClick={(click) => {
-          click.preventDefault();
-          openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
-        }}
         className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
       >
         {issuerName(event.issuer)}에서 응모

@@ -2,8 +2,8 @@ import { o as __toESM } from "../_runtime.mjs";
 import { b as require_jsx_runtime, q as require_react } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as MARKETS, r as issuerMeta, t as ISSUERS } from "./store.server-qWZeByN8.mjs";
 import { a as ArrowUpRight, i as ChevronDown, n as Search, r as RefreshCw } from "../_libs/lucide-react.mjs";
-import { a as reloadPharma, c as storePharmaLogin, i as editPharmaCompany, l as reloadBoard, n as Route$1, o as removePharmaCompany, r as createPharmaCompany, s as removePharmaLogin } from "./router-B8TJ0_b1.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/routes-DcKcLiXV.js
+import { a as reloadPharma, c as storePharmaLogin, i as editPharmaCompany, l as reloadBoard, n as Route$1, o as removePharmaCompany, r as createPharmaCompany, s as removePharmaLogin } from "./router-CQZ5jOrK.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-90ar-xEQ.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 /**
@@ -852,10 +852,6 @@ function EventRow({ event, today, open, onToggle }) {
 							href: event.applyUrl,
 							target: "_blank",
 							rel: "noreferrer",
-							onClick: (click) => {
-								click.preventDefault();
-								openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
-							},
 							className: "ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink",
 							children: ["응모", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
 						})
@@ -920,10 +916,6 @@ function EventRow({ event, today, open, onToggle }) {
 					href: event.applyUrl,
 					target: "_blank",
 					rel: "noreferrer",
-					onClick: (click) => {
-						click.preventDefault();
-						openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
-					},
 					className: "mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink",
 					children: ["응모", /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowUpRight, { className: "size-3" })]
 				})]
@@ -984,10 +976,6 @@ function EventBody({ event, id }) {
 				href: event.applyUrl,
 				target: "_blank",
 				rel: "noreferrer",
-				onClick: (click) => {
-					click.preventDefault();
-					openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
-				},
 				className: "mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto",
 				children: [
 					issuerName(event.issuer),
