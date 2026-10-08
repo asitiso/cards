@@ -4,15 +4,21 @@ import { useMemo, useState, type ReactNode } from "react";
 import { getBoard, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
+import { PharmaScreen } from "@/components/pharma-screen";
+import { getPharmaBoard } from "@/lib/pharma/board.functions";
 
 export const Route = createFileRoute("/")({
-  loader: () => getBoard(),
+  loader: async () => {
+    const [board, pharma] = await Promise.all([getBoard(), getPharmaBoard()]);
+    return { board, pharma };
+  },
   component: Home,
 });
 
 function Home() {
-  const initial = Route.useLoaderData();
-  const [board, setBoard] = useState<Board>(initial);
+  const data = Route.useLoaderData();
+  const [board, setBoard] = useState<Board>(data.board);
+  const [desk, setDesk] = useState<"finance" | "pharma">("finance");
   const [market, setMarket] = useState<Market>("card");
   const [issuer, setIssuer] = useState<IssuerId | "all">("all");
   const [sort, setSort] = useState<"soon" | "new">("soon");
@@ -64,10 +70,23 @@ function Home() {
     }
   }
 
+  if (desk === "pharma") {
+    return <PharmaScreen initial={data.pharma} onFinance={() => setDesk("finance")} />;
+  }
+
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
       <header className="flex items-center justify-between gap-2">
-        <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅇㅁㅁㅇ</h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅇㅁㅁㅇ</h1>
+          <button
+            type="button"
+            onClick={() => setDesk("pharma")}
+            className="shrink-0 text-2xl font-medium tracking-tight text-muted"
+          >
+            ㅈㅇㅅ
+          </button>
+        </div>
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 truncate text-right text-[11px] tabular-nums leading-tight text-muted sm:text-xs">
             수집 {formatWhen(board.collectedAt)}
