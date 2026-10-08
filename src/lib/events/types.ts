@@ -1,3 +1,5 @@
+import type { ChangeRecord } from "@/lib/change-history/types";
+
 export const MARKETS = [
   { id: "card", label: "카드" },
   { id: "securities", label: "증권" },
@@ -366,6 +368,7 @@ export type Board = {
   today: string;
   events: EntryEvent[];
   issuers: IssuerReport[];
+  changes: ChangeRecord[];
 };
 
 export function issuerMeta(id: IssuerId): IssuerMeta {
