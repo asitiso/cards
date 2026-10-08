@@ -5,6 +5,7 @@ import { getBoard, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
 import { PharmaScreen } from "@/components/pharma-screen";
+import { ChangeHistory } from "@/components/change-history";
 import { getPharmaBoard } from "@/lib/pharma/board.functions";
 
 export const Route = createFileRoute("/")({
@@ -110,6 +111,8 @@ function Home() {
       </header>
 
       {error ? <p className="mt-2 text-sm text-accent">{error}</p> : null}
+
+      <ChangeHistory changes={board.changes} sourceName={issuerName} />
 
       <div className="mt-3 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5" role="tablist" aria-label="종류">
         {MARKETS.map((item) => {
