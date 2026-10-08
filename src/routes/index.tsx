@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowUpRight, RefreshCw, Search, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { getBoard, reloadBoard } from "@/lib/events/board.functions";
 import { ISSUERS, type Board, type EntryEvent, type IssuerId } from "@/lib/events/types";
@@ -16,7 +15,7 @@ function Home() {
   const [issuer, setIssuer] = useState<IssuerId | "all">("all");
   const [sort, setSort] = useState<"soon" | "new">("soon");
   const [query, setQuery] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openIds, setOpenIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,7 +43,11 @@ function Home() {
       );
   }, [board.events, issuer, query, sort]);
 
-  const open = board.events.find((event) => event.id === openId) ?? null;
+  function toggle(id: string) {
+    setOpenIds((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    );
+  }
 
   async function refresh() {
     setPending(true);
@@ -59,14 +62,14 @@ function Home() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
-      <header className="flex flex-col gap-6 border-b border-line pb-6 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-4 py-5 sm:px-6 sm:py-8">
+      <header className="flex flex-col gap-4 border-b border-line pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-xl">
           <p className="text-sm font-medium tracking-wide text-accent">카드사 응모만</p>
-          <h1 className="mt-2 text-balance text-4xl font-semibold tracking-tight">응모만</h1>
-          <p className="mt-3 text-pretty text-base leading-relaxed text-muted">
+          <h1 className="mt-1 text-balance text-3xl font-semibold tracking-tight">응모만</h1>
+          <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">
             신한·삼성·현대·KB·롯데·우리·하나·NH·BC·IBK·카카오뱅크·토스뱅크 안에서, 버튼을 눌러
-            신청하는 이벤트만 골랐습니다. 실제 응모는 카드사 화면에서 합니다.
+            신청하는 이벤트만 골랐습니다. 행을 누르면 조건이 펼쳐지고, 응모는 카드사에서 합니다.
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -119,73 +122,47 @@ function Home() {
         })}
       </div>
 
-      <p className="mt-4 text-sm text-muted">{visible.length}건</p>
+      <p className="mt-3 text-sm text-muted">{visible.length}건 · 행을 눌러 접고 펼칩니다</p>
 
       {visible.length === 0 ? (
-        <p className="mt-8 rounded-3xl border border-dashed border-line bg-card px-5 py-10 text-center text-sm text-muted">
+        <p className="mt-4 rounded-2xl border border-dashed border-line bg-card px-5 py-8 text-center text-sm text-muted">
           이 조건의 응모 이벤트가 없습니다. 다른 카드사를 보거나 아래 수집 현황에서 카드사로
           이동하세요.
         </p>
       ) : (
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+        <ul className="mt-2 overflow-hidden rounded-2xl border border-line bg-card">
           {visible.map((event) => (
-            <li key={event.id}>
-              <article className="flex h-full flex-col rounded-3xl border border-line bg-card p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-medium text-muted">{issuerName(event.issuer)}</p>
-                  <Deadline end={event.endDate} today={board.today} />
-                </div>
-                <h2 className="mt-3 text-balance text-lg font-semibold leading-snug">{event.title}</h2>
-                <p className="mt-2 line-clamp-3 text-pretty text-sm leading-relaxed text-muted">
-                  {event.summary}
-                </p>
-                <p className="mt-4 text-sm tabular-nums text-ink">
-                  {formatDay(event.startDate)} – {formatDay(event.endDate)}
-                </p>
-                <div className="mt-5 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(event.id)}
-                    className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-line text-sm font-medium"
-                  >
-                    응모 조건
-                  </button>
-                  <a
-                    href={event.applyUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex h-11 flex-1 items-center justify-center gap-1 rounded-full bg-accent text-sm font-medium text-accent-ink"
-                  >
-                    응모하기
-                    <ArrowUpRight className="size-4" />
-                  </a>
-                </div>
-              </article>
-            </li>
+            <EventRow
+              key={event.id}
+              event={event}
+              today={board.today}
+              open={openIds.includes(event.id)}
+              onToggle={() => toggle(event.id)}
+            />
           ))}
         </ul>
       )}
 
-      <section className="mt-12 border-t border-line pt-6">
-        <h2 className="text-lg font-semibold">수집 현황</h2>
+      <section className="mt-8 border-t border-line pt-5">
+        <h2 className="text-base font-semibold">수집 현황</h2>
         <p className="mt-1 text-sm text-muted">
           막힌 카드사는 마지막 목록을 유지하고, 응모는 항상 카드사로 넘어갑니다.
         </p>
-        <ul className="mt-4 divide-y divide-line rounded-3xl border border-line bg-card">
+        <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
           {board.issuers.map((item) => (
-            <li key={item.id} className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium">
+            <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 sm:px-4">
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-snug">
                   {item.name}
-                  <span className="ml-2 tabular-nums text-muted">{item.count}건</span>
+                  <span className="ml-2 font-normal tabular-nums text-muted">{item.count}건</span>
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{item.message}</p>
+                <p className="text-xs leading-snug text-muted">{item.message}</p>
               </div>
               <a
                 href={item.listUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex h-11 shrink-0 items-center gap-1 text-sm font-medium text-accent"
+                className="inline-flex h-9 shrink-0 items-center gap-0.5 text-sm font-medium text-accent"
               >
                 카드사로
                 <ArrowUpRight className="size-4" />
@@ -194,72 +171,97 @@ function Home() {
           ))}
         </ul>
       </section>
-
-      <Dialog.Root open={open !== null} onOpenChange={(next) => !next && setOpenId(null)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-ink/40" />
-          <Dialog.Content className="fixed inset-x-3 top-10 z-10 max-h-[80vh] overflow-y-auto rounded-3xl bg-card p-5 shadow-none sm:inset-x-auto sm:left-1/2 sm:w-full sm:max-w-lg sm:-translate-x-1/2">
-            {open ? <EventDetail event={open} today={board.today} onClose={() => setOpenId(null)} /> : null}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
     </main>
   );
 }
 
-function EventDetail({
+function EventRow({
   event,
   today,
-  onClose,
+  open,
+  onToggle,
 }: {
   event: EntryEvent;
   today: string;
-  onClose: () => void;
+  open: boolean;
+  onToggle: () => void;
 }) {
+  const panelId = `event-panel-${event.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const benefit =
+    event.benefit && event.benefit !== event.summary && event.benefit !== event.title
+      ? event.benefit
+      : "";
   return (
-    <div>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <Dialog.Title className="text-balance text-xl font-semibold">{event.title}</Dialog.Title>
-          <Dialog.Description className="mt-2 text-sm text-muted">
-            {issuerName(event.issuer)} · {formatDay(event.startDate)} – {formatDay(event.endDate)}
-          </Dialog.Description>
-        </div>
-        <button type="button" onClick={onClose} className="inline-flex size-11 items-center justify-center" aria-label="닫기">
-          <X className="size-5" />
+    <li className="border-b border-line last:border-b-0">
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 py-1 pl-3 text-left sm:gap-3 sm:pl-4"
+        >
+          <Deadline end={event.endDate} today={today} />
+          <span className="w-9 shrink-0 text-xs font-medium text-muted sm:w-12">
+            {issuerShort(event.issuer)}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{event.title}</span>
+          <span className="hidden shrink-0 text-xs tabular-nums text-muted sm:inline">
+            {formatDay(event.startDate).slice(5)}–{formatDay(event.endDate).slice(5)}
+          </span>
+          <ChevronDown
+            className={`size-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          />
         </button>
+        <a
+          href={event.applyUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-11 shrink-0 items-center gap-0.5 pr-3 text-xs font-medium text-accent sm:pr-4"
+        >
+          응모
+          <ArrowUpRight className="size-3.5" />
+        </a>
       </div>
-      <div className="mt-3">
-        <Deadline end={event.endDate} today={today} />
-      </div>
-      <p className="mt-4 text-pretty text-sm leading-relaxed">{event.summary}</p>
-      <h3 className="mt-6 text-sm font-semibold">응모 조건</h3>
-      <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted">
-        {(event.conditions.length ? event.conditions : ["카드사 페이지의 조건을 확인하세요."]).map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-      {event.exclusions.length ? (
-        <>
-          <h3 className="mt-6 text-sm font-semibold">제외·유의사항</h3>
-          <ul className="mt-2 list-disc space-y-2 pl-5 text-sm leading-relaxed text-muted">
-            {event.exclusions.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
+      {open ? (
+        <div id={panelId} className="border-t border-line bg-paper px-3 py-3 sm:px-4">
+          <h2 className="text-pretty text-sm font-semibold leading-snug">{event.title}</h2>
+          <p className="mt-1.5 text-pretty text-sm leading-relaxed">{event.summary}</p>
+          {benefit ? <p className="mt-1 text-sm font-medium text-ink">{benefit}</p> : null}
+          <p className="mt-2 text-xs tabular-nums text-muted">
+            {issuerName(event.issuer)} · {formatDay(event.startDate)} – {formatDay(event.endDate)}
+          </p>
+          <h3 className="mt-3 text-sm font-semibold">응모 조건</h3>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted">
+            {(event.conditions.length ? event.conditions : ["카드사 페이지의 조건을 확인하세요."]).map(
+              (line) => (
+                <li key={line}>{line}</li>
+              ),
+            )}
           </ul>
-        </>
+          {event.exclusions.length ? (
+            <>
+              <h3 className="mt-3 text-sm font-semibold">제외·유의사항</h3>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted">
+                {event.exclusions.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          <a
+            href={event.applyUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex h-10 items-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink"
+          >
+            {issuerName(event.issuer)}에서 응모
+            <ArrowUpRight className="size-4" />
+          </a>
+        </div>
       ) : null}
-      <a
-        href={event.applyUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-6 inline-flex h-12 w-full items-center justify-center gap-1 rounded-full bg-accent text-sm font-medium text-accent-ink"
-      >
-        {issuerName(event.issuer)}에서 응모
-        <ArrowUpRight className="size-4" />
-      </a>
-      <p className="mt-3 text-center text-sm text-muted">혜택 지급과 대상 여부는 카드사 기준입니다.</p>
-    </div>
+    </li>
   );
 }
 
@@ -319,8 +321,8 @@ function Deadline({ end, today }: { end: string; today: string }) {
     <span
       className={
         hot
-          ? "rounded-full bg-accent px-2.5 py-1 text-xs font-medium tabular-nums text-accent-ink"
-          : "rounded-full bg-paper px-2.5 py-1 text-xs font-medium tabular-nums text-muted"
+          ? "inline-flex w-[4.75rem] shrink-0 justify-center rounded-full bg-accent px-1 py-0.5 text-xs font-medium tabular-nums text-accent-ink"
+          : "inline-flex w-[4.75rem] shrink-0 justify-center rounded-full bg-paper px-1 py-0.5 text-xs font-medium tabular-nums text-muted"
       }
     >
       {label}
@@ -330,6 +332,10 @@ function Deadline({ end, today }: { end: string; today: string }) {
 
 function issuerName(id: IssuerId): string {
   return ISSUERS.find((item) => item.id === id)?.name ?? id;
+}
+
+function issuerShort(id: IssuerId): string {
+  return ISSUERS.find((item) => item.id === id)?.short ?? id;
 }
 
 function daysUntil(end: string, today: string): number {
