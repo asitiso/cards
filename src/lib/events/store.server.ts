@@ -1,4 +1,6 @@
 import { getSql, dbSource } from "@/lib/db";
+import { diffEventLists } from "@/lib/change-history/diff";
+import { appendChanges, recentChanges } from "@/lib/change-history/store.server";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
 import { SNAPSHOT_AT, SNAPSHOT_EVENTS, SNAPSHOT_REPORT } from "./snapshot.ts";
@@ -183,6 +185,7 @@ async function readBoard(): Promise<Board> {
     today: seoulToday(),
     events,
     issuers: fullReport(partial, counts),
+    changes: await recentChanges("finance"),
   };
 }
 
@@ -208,6 +211,7 @@ function bundledBoard(): Board {
     today: seoulToday(),
     events,
     issuers: fullReport(partial, counts),
+    changes: [],
   };
 }
 
@@ -225,7 +229,15 @@ export async function refreshBoard(): Promise<Board> {
   const hits = await collectLive(today);
   const collectedAt = new Date().toISOString();
   for (const hit of hits) {
-    if (!hit.ok) continue;
+    // A failing or unexpectedly empty scraper must never erase a saved list.
+    if (!hit.ok || hit.events.length === 0) continue;
+    const previousRows = await sql<EventRow>`
+      select id, issuer, title, summary, benefit, conditions, exclusions,
+             start_date::text as start_date, end_date::text as end_date,
+             apply_url, list_url, entry
+      from entry_events where issuer = ${hit.issuer} and active = true
+    `;
+    const previousEvents = previousRows.map(toEvent);
     await sql`update entry_events set active = false where issuer = ${hit.issuer}`;
     for (const event of hit.events) {
       await sql`
@@ -253,6 +265,12 @@ export async function refreshBoard(): Promise<Board> {
           entry = excluded.entry
       `;
     }
+    const changes = diffEventLists(previousEvents, hit.events, [
+      ["title", "제목"], ["summary", "내용"], ["benefit", "혜택"],
+      ["conditions", "조건"], ["exclusions", "유의사항"], ["startDate", "시작일"],
+      ["endDate", "종료일"], ["applyUrl", "링크"], ["entry", "응모 여부"],
+    ]);
+    await appendChanges("finance", hit.issuer, changes);
   }
   const previous = await sql<{ report: string }>`select report from collect_state where id = 1`;
   let prior: { id: IssuerId; ok: boolean; message: string; count: number }[] = [];
