@@ -32,8 +32,8 @@ const QUIET: Record<string, string> = {
   nh: "NH농협카드 응모 탭을 이번엔 열지 못했습니다.",
   bc: "BC·페이북 목록을 이번엔 열지 못했습니다.",
   ibk: "IBK 카드 행사 목록을 이번엔 열지 못했습니다.",
-  kakaobank: "카카오뱅크 체크 혜택은 결제하면 적용되는 경우가 많아 별도 응모 목록이 없습니다.",
-  tossbank: "토스뱅크 체크 혜택은 앱에서 고르는 방식이라 홈페이지 응모 목록이 없습니다.",
+  kakaobank: "카카오뱅크 이벤트는 앱에서 열리는 경우가 많습니다. 목록이 비면 앱으로 이동하세요.",
+  tossbank: "토스뱅크 이벤트는 앱 안 행사가 많습니다. 목록이 비면 앱으로 이동하세요.",
 };
 
 function asList(value: string): string[] {
@@ -84,7 +84,7 @@ function fullReport(
       listUrl: issuer.listUrl,
       count,
       ok: false,
-      message: QUIET[issuer.id] ?? "이번 수집에서 응모 이벤트를 찾지 못했습니다.",
+      message: QUIET[issuer.id] ?? "이번 수집에서 응모·쿠폰·추첨 이벤트를 찾지 못했습니다.",
     };
   });
 }

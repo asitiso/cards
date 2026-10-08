@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { getBoard, reloadBoard } from "@/lib/events/board.functions";
-import { ISSUERS, type Board, type EntryEvent, type IssuerId } from "@/lib/events/types";
+import { openApply } from "@/lib/events/open-apply";
+import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
 
 export const Route = createFileRoute("/")({
   loader: () => getBoard(),
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   const initial = Route.useLoaderData();
   const [board, setBoard] = useState<Board>(initial);
+  const [market, setMarket] = useState<Market>("card");
   const [issuer, setIssuer] = useState<IssuerId | "all">("all");
   const [sort, setSort] = useState<"soon" | "new">("soon");
   const [query, setQuery] = useState("");
@@ -22,6 +24,7 @@ function Home() {
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return board.events
+      .filter((event) => issuerMeta(event.issuer).market === market)
       .filter((event) => issuer === "all" || event.issuer === issuer)
       .filter((event) => {
         if (!q) return true;
@@ -41,7 +44,7 @@ function Home() {
           ? b.startDate.localeCompare(a.startDate) || a.endDate.localeCompare(b.endDate)
           : a.endDate.localeCompare(b.endDate) || a.title.localeCompare(b.title, "ko"),
       );
-  }, [board.events, issuer, query, sort]);
+  }, [board.events, issuer, market, query, sort]);
 
   function toggle(id: string) {
     setOpenIds((current) =>
@@ -62,57 +65,80 @@ function Home() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-4 py-5 sm:px-6 sm:py-8">
-      <header className="flex flex-col gap-4 border-b border-line pb-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="max-w-xl">
-          <p className="text-sm font-medium tracking-wide text-accent">카드사 응모만</p>
-          <h1 className="mt-1 text-balance text-3xl font-semibold tracking-tight">응모만</h1>
-          <p className="mt-2 text-pretty text-sm leading-relaxed text-muted">
-            신한·삼성·현대·KB·롯데·우리·하나·NH·BC·IBK·카카오뱅크·토스뱅크 안에서, 버튼을 눌러
-            신청하는 이벤트만 골랐습니다. 행을 누르면 조건이 펼쳐지고, 응모는 카드사에서 합니다.
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
+      <header className="flex items-center justify-between gap-2">
+        <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅇㅁㅁㅇ</h1>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="min-w-0 truncate text-right text-[11px] tabular-nums leading-tight text-muted sm:text-xs">
+            수집 {formatWhen(board.collectedAt)}
           </p>
-        </div>
-        <div className="flex flex-col items-start gap-2 sm:items-end">
           <button
             type="button"
             onClick={() => void refresh()}
             disabled={pending}
-            className="inline-flex h-11 items-center gap-2 rounded-full bg-ink px-4 text-sm font-medium text-paper disabled:opacity-60"
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-ink px-3 text-xs font-medium text-paper disabled:opacity-60"
           >
-            <RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />
+            <RefreshCw className={pending ? "size-3.5 animate-spin" : "size-3.5"} />
             {pending ? "수집 중" : "다시 수집"}
           </button>
-          <p className="text-sm tabular-nums text-muted">마지막 수집 {formatWhen(board.collectedAt)}</p>
         </div>
       </header>
 
-      {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}
+      {error ? <p className="mt-2 text-sm text-accent">{error}</p> : null}
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <label className="flex h-11 flex-1 items-center gap-2 rounded-full border border-line bg-card px-4">
-          <Search className="size-4 text-muted" />
+      <div className="mt-3 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5" role="tablist" aria-label="종류">
+        {MARKETS.map((item) => {
+          const count = board.events.filter((event) => issuerMeta(event.issuer).market === item.id).length;
+          const active = market === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setMarket(item.id);
+                setIssuer("all");
+              }}
+              className={
+                active
+                  ? "h-8 rounded-full bg-ink text-xs font-medium text-paper sm:text-sm"
+                  : "h-8 rounded-full text-xs text-muted sm:text-sm"
+              }
+            >
+              {item.label} {count}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex items-center gap-1.5">
+        <label className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-full border border-line bg-card px-3">
+          <Search className="size-3.5 shrink-0 text-muted" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="혜택, 카드사, 조건 검색"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+            placeholder="혜택, 회사, 조건"
+            className="w-full bg-transparent text-base leading-none outline-none placeholder:text-muted sm:text-sm"
           />
         </label>
-        <div className="flex h-11 rounded-full border border-line bg-card p-1">
+        <div className="flex h-8 shrink-0 rounded-full border border-line bg-card p-0.5">
           <SortButton active={sort === "soon"} onClick={() => setSort("soon")}>
-            마감 임박
+            <span className="sm:hidden">마감</span>
+            <span className="hidden sm:inline">마감 임박</span>
           </SortButton>
           <SortButton active={sort === "new"} onClick={() => setSort("new")}>
-            최근 시작
+            <span className="sm:hidden">최근</span>
+            <span className="hidden sm:inline">최근 시작</span>
           </SortButton>
         </div>
       </div>
 
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+      <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 pb-0.5 sm:mx-0 sm:px-0">
         <Chip active={issuer === "all"} onClick={() => setIssuer("all")}>
-          전체 {board.events.length}
+          전체 {board.events.filter((event) => issuerMeta(event.issuer).market === market).length}
         </Chip>
-        {ISSUERS.map((item) => {
+        {ISSUERS.filter((item) => item.market === market).map((item) => {
           const count = board.events.filter((event) => event.issuer === item.id).length;
           return (
             <Chip key={item.id} active={issuer === item.id} onClick={() => setIssuer(item.id)}>
@@ -122,15 +148,14 @@ function Home() {
         })}
       </div>
 
-      <p className="mt-3 text-sm text-muted">{visible.length}건 · 행을 눌러 접고 펼칩니다</p>
+      <p className="mt-2 text-xs text-muted">{visible.length}건</p>
 
       {visible.length === 0 ? (
-        <p className="mt-4 rounded-2xl border border-dashed border-line bg-card px-5 py-8 text-center text-sm text-muted">
-          이 조건의 응모 이벤트가 없습니다. 다른 카드사를 보거나 아래 수집 현황에서 카드사로
-          이동하세요.
+        <p className="mt-2 rounded-2xl border border-dashed border-line bg-card px-4 py-6 text-center text-sm text-muted">
+          이 종류에서 응모·쿠폰·추첨 이벤트가 없습니다. 아래 회사 앱에서 확인하세요.
         </p>
       ) : (
-        <ul className="mt-2 overflow-hidden rounded-2xl border border-line bg-card">
+        <ul className="mt-1.5 overflow-hidden rounded-2xl border border-line bg-card">
           {visible.map((event) => (
             <EventRow
               key={event.id}
@@ -143,29 +168,31 @@ function Home() {
         </ul>
       )}
 
-      <section className="mt-8 border-t border-line pt-5">
-        <h2 className="text-base font-semibold">수집 현황</h2>
-        <p className="mt-1 text-sm text-muted">
-          막힌 카드사는 마지막 목록을 유지하고, 응모는 항상 카드사로 넘어갑니다.
-        </p>
-        <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
-          {board.issuers.map((item) => (
-            <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-2 sm:px-4">
+      <section className="mt-6 border-t border-line pt-4">
+        <h2 className="text-sm font-semibold">수집 현황</h2>
+        <ul className="mt-2 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card">
+          {board.issuers
+            .filter((item) => issuerMeta(item.id).market === market)
+            .map((item) => (
+            <li key={item.id} className="flex items-center justify-between gap-3 px-3 py-2">
               <div className="min-w-0">
                 <p className="text-sm font-medium leading-snug">
                   {item.name}
                   <span className="ml-2 font-normal tabular-nums text-muted">{item.count}건</span>
                 </p>
-                <p className="text-xs leading-snug text-muted">{item.message}</p>
+                <p className="truncate text-xs leading-snug text-muted">{item.message}</p>
               </div>
               <a
                 href={item.listUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-9 shrink-0 items-center gap-0.5 text-sm font-medium text-accent"
+                onClick={(click) => {
+                  click.preventDefault();
+                  const meta = issuerMeta(item.id);
+                  openApply(item.listUrl, meta.androidPackage, "app", meta.iosAppId);
+                }}
+                className="inline-flex h-7 shrink-0 items-center gap-0.5 text-xs font-medium text-accent"
               >
-                카드사로
-                <ArrowUpRight className="size-4" />
+                바로가기
+                <ArrowUpRight className="size-3.5" />
               </a>
             </li>
           ))}
@@ -187,81 +214,140 @@ function EventRow({
   onToggle: () => void;
 }) {
   const panelId = `event-panel-${event.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  return (
+    <li className="border-b border-line last:border-b-0">
+      <div className="px-2.5 py-1.5 sm:hidden">
+        <div className="flex items-center gap-1.5">
+          <Deadline end={event.endDate} today={today} />
+          <span className="text-[11px] font-medium text-muted">{issuerShort(event.issuer)}</span>
+          <span className="text-[11px] tabular-nums text-muted">~{formatDay(event.endDate).slice(5)}</span>
+          <a
+            href={event.applyUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(click) => {
+              click.preventDefault();
+              openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
+            }}
+            className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
+          >
+            응모
+            <ArrowUpRight className="size-3" />
+          </a>
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={`${panelId}-m`}
+          className="mt-0.5 flex w-full items-start gap-1 text-left"
+        >
+          <span
+            className={
+              open
+                ? "min-w-0 flex-1 text-pretty text-[13px] font-semibold leading-snug"
+                : "min-w-0 flex-1 line-clamp-2 text-[13px] font-medium leading-snug"
+            }
+          >
+            {event.title}
+          </span>
+          <ChevronDown
+            className={`mt-0.5 size-3.5 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
+        {open ? <EventBody event={event} id={`${panelId}-m`} /> : null}
+      </div>
+
+      <div className="hidden sm:block">
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-controls={panelId}
+            className="flex min-h-9 min-w-0 flex-1 items-center gap-2 py-1 pl-3 text-left"
+          >
+            <Deadline end={event.endDate} today={today} />
+            <span className="w-10 shrink-0 text-[11px] font-medium text-muted">{issuerShort(event.issuer)}</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{event.title}</span>
+            <span className="shrink-0 text-[11px] tabular-nums text-muted">
+              {formatDay(event.startDate).slice(5)}–{formatDay(event.endDate).slice(5)}
+            </span>
+            <ChevronDown
+              className={`size-3.5 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </button>
+          <a
+            href={event.applyUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(click) => {
+              click.preventDefault();
+              openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
+            }}
+            className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
+          >
+            응모
+            <ArrowUpRight className="size-3" />
+          </a>
+        </div>
+        {open ? (
+          <div className="border-t border-line">
+            <EventBody event={event} id={panelId} />
+          </div>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+function EventBody({ event, id }: { event: EntryEvent; id: string }) {
   const benefit =
     event.benefit && event.benefit !== event.summary && event.benefit !== event.title
       ? event.benefit
       : "";
   return (
-    <li className="border-b border-line last:border-b-0">
-      <div className="flex items-center">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          aria-controls={panelId}
-          className="flex min-h-11 min-w-0 flex-1 items-center gap-2 py-1 pl-3 text-left sm:gap-3 sm:pl-4"
-        >
-          <Deadline end={event.endDate} today={today} />
-          <span className="w-9 shrink-0 text-xs font-medium text-muted sm:w-12">
-            {issuerShort(event.issuer)}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">{event.title}</span>
-          <span className="hidden shrink-0 text-xs tabular-nums text-muted sm:inline">
-            {formatDay(event.startDate).slice(5)}–{formatDay(event.endDate).slice(5)}
-          </span>
-          <ChevronDown
-            className={`size-4 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
-            aria-hidden
-          />
-        </button>
-        <a
-          href={event.applyUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-11 shrink-0 items-center gap-0.5 pr-3 text-xs font-medium text-accent sm:pr-4"
-        >
-          응모
-          <ArrowUpRight className="size-3.5" />
-        </a>
-      </div>
-      {open ? (
-        <div id={panelId} className="border-t border-line bg-paper px-3 py-3 sm:px-4">
-          <h2 className="text-pretty text-sm font-semibold leading-snug">{event.title}</h2>
-          <p className="mt-1.5 text-pretty text-sm leading-relaxed">{event.summary}</p>
-          {benefit ? <p className="mt-1 text-sm font-medium text-ink">{benefit}</p> : null}
-          <p className="mt-2 text-xs tabular-nums text-muted">
-            {issuerName(event.issuer)} · {formatDay(event.startDate)} – {formatDay(event.endDate)}
-          </p>
-          <h3 className="mt-3 text-sm font-semibold">응모 조건</h3>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted">
-            {(event.conditions.length ? event.conditions : ["카드사 페이지의 조건을 확인하세요."]).map(
-              (line) => (
-                <li key={line}>{line}</li>
-              ),
-            )}
+    <div id={id} className="mt-1.5 rounded-xl bg-paper px-2.5 py-2.5 sm:mt-0 sm:rounded-none sm:px-3">
+      <h2 className="hidden text-pretty text-sm font-semibold leading-snug sm:block">{event.title}</h2>
+      <p className="text-pretty text-sm leading-relaxed sm:mt-1">{event.summary}</p>
+      {benefit ? <p className="mt-1 text-sm font-medium">{benefit}</p> : null}
+      <p className="mt-1.5 text-xs tabular-nums text-muted">
+        {issuerName(event.issuer)} · {formatDay(event.startDate)} – {formatDay(event.endDate)}
+      </p>
+      <h3 className="mt-2 text-sm font-semibold">응모 조건</h3>
+      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm leading-relaxed text-muted">
+        {(event.conditions.length ? event.conditions : ["카드사 페이지의 조건을 확인하세요."]).map(
+          (line) => (
+            <li key={line}>{line}</li>
+          ),
+        )}
+      </ul>
+      {event.exclusions.length ? (
+        <>
+          <h3 className="mt-2 text-sm font-semibold">제외·유의사항</h3>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm leading-relaxed text-muted">
+            {event.exclusions.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
           </ul>
-          {event.exclusions.length ? (
-            <>
-              <h3 className="mt-3 text-sm font-semibold">제외·유의사항</h3>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted">
-                {event.exclusions.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          <a
-            href={event.applyUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex h-10 items-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink"
-          >
-            {issuerName(event.issuer)}에서 응모
-            <ArrowUpRight className="size-4" />
-          </a>
-        </div>
+        </>
       ) : null}
-    </li>
+      <a
+        href={event.applyUrl}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(click) => {
+          click.preventDefault();
+          openApply(event.applyUrl, issuerMeta(event.issuer).androidPackage);
+        }}
+        className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
+      >
+        {issuerName(event.issuer)}에서 응모
+        <ArrowUpRight className="size-4" />
+      </a>
+    </div>
   );
 }
 
@@ -280,8 +366,8 @@ function SortButton({
       onClick={onClick}
       className={
         active
-          ? "h-9 rounded-full bg-ink px-3 text-sm font-medium text-paper"
-          : "h-9 rounded-full px-3 text-sm text-muted"
+          ? "h-7 rounded-full bg-ink px-2.5 text-xs font-medium text-paper"
+          : "h-7 rounded-full px-2.5 text-xs text-muted"
       }
     >
       {children}
@@ -304,8 +390,8 @@ function Chip({
       onClick={onClick}
       className={
         active
-          ? "h-11 shrink-0 rounded-full bg-ink px-4 text-sm font-medium text-paper"
-          : "h-11 shrink-0 rounded-full border border-line bg-card px-4 text-sm text-ink"
+          ? "h-7 shrink-0 rounded-full bg-ink px-2.5 text-xs font-medium text-paper"
+          : "h-7 shrink-0 rounded-full border border-line bg-card px-2.5 text-xs text-ink"
       }
     >
       {children}
@@ -315,14 +401,14 @@ function Chip({
 
 function Deadline({ end, today }: { end: string; today: string }) {
   const days = daysUntil(end, today);
-  const label = days < 0 ? "종료" : days === 0 ? "오늘 마감" : `D-${days}`;
+  const label = days < 0 ? "종료" : days === 0 ? "오늘" : `D-${days}`;
   const hot = days >= 0 && days <= 7;
   return (
     <span
       className={
         hot
-          ? "inline-flex w-[4.75rem] shrink-0 justify-center rounded-full bg-accent px-1 py-0.5 text-xs font-medium tabular-nums text-accent-ink"
-          : "inline-flex w-[4.75rem] shrink-0 justify-center rounded-full bg-paper px-1 py-0.5 text-xs font-medium tabular-nums text-muted"
+          ? "inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium tabular-nums text-accent-ink"
+          : "inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-full bg-paper px-1 text-[10px] font-medium tabular-nums text-muted"
       }
     >
       {label}
@@ -352,11 +438,14 @@ function formatDay(iso: string): string {
 function formatWhen(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("ko-KR", {
+  const parts = new Intl.DateTimeFormat("ko-KR", {
     timeZone: "Asia/Seoul",
-    month: "long",
+    month: "numeric",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date);
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("month")}.${get("day")} ${get("hour")}:${get("minute")}`;
 }

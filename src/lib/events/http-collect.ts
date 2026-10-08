@@ -11,6 +11,7 @@ import {
   ymd,
 } from "./html.ts";
 import { issuerMeta, type EntryEvent, type IssuerId } from "./types.ts";
+import { collectMarkets } from "./market-collect.ts";
 
 export type CollectHit = {
   issuer: IssuerId;
@@ -824,15 +825,19 @@ async function collectIbk(today: string): Promise<CollectHit> {
 }
 
 export async function collectLive(today = seoulToday()): Promise<CollectHit[]> {
-  return Promise.all([
-    collectShinhan(today),
-    collectSamsung(today),
-    collectHyundai(today),
-    collectKb(today),
-    collectLotte(today),
-    collectHana(today),
-    collectNh(today),
-    collectBc(today),
-    collectIbk(today),
+  const [cards, markets] = await Promise.all([
+    Promise.all([
+      collectShinhan(today),
+      collectSamsung(today),
+      collectHyundai(today),
+      collectKb(today),
+      collectLotte(today),
+      collectHana(today),
+      collectNh(today),
+      collectBc(today),
+      collectIbk(today),
+    ]),
+    collectMarkets(today),
   ]);
+  return [...cards, ...markets];
 }
