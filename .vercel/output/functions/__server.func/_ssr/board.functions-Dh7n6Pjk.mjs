@@ -1,14 +1,7 @@
-import { n as TSS_SERVER_FUNCTION, t as createServerFn } from "./ssr.mjs";
-import { a as refreshBoard, i as loadBoard } from "./store.server-B5M9eq0J.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/board.functions-bq3bx83O.js
-var createServerRpc = (serverFnMeta, splitImportFn) => {
-	const url = "/_serverFn/" + serverFnMeta.id;
-	return Object.assign(splitImportFn, {
-		url,
-		serverFnMeta,
-		[TSS_SERVER_FUNCTION]: true
-	});
-};
+import { t as createServerFn } from "./ssr.mjs";
+import { t as createServerRpc } from "./createServerRpc-A6pJPYTF.mjs";
+import { a as refreshBoard, i as loadBoard } from "./store.server-qWZeByN8.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/board.functions-Dh7n6Pjk.js
 var getBoard_createServerFn_handler = createServerRpc({
 	id: "8c14451dae457ac2e171179defe6369842c145c577862973196c2960056b5a59",
 	name: "getBoard",

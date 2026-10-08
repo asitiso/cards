@@ -1,10 +1,11 @@
 import { o as __toESM } from "../_runtime.mjs";
 import { _ as createFileRoute, b as require_jsx_runtime, d as Scripts, f as HeadContent, g as lazyRouteComponent, h as Outlet, m as createRouter, q as require_react, v as createRootRoute, y as useRouter } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as TSS_SERVER_FUNCTION, r as getServerFnById, t as createServerFn } from "./ssr.mjs";
-import { a as refreshBoard } from "./store.server-B5M9eq0J.mjs";
+import { a as refreshPharma } from "./store.server-RFviKh6B.mjs";
+import { a as refreshBoard } from "./store.server-qWZeByN8.mjs";
 import { t as TriangleAlert } from "../_libs/lucide-react.mjs";
 import { a as union, i as string, n as number, r as object, t as literal } from "../_libs/zod.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-ZLc4sc69.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-CIHqb1Xr.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 var __defProp = Object.defineProperty;
@@ -308,7 +309,7 @@ function PreviewHostBridge() {
 	}, [router]);
 	return null;
 }
-var styles_default = "/assets/styles-BI0Q6QkT.css";
+var styles_default = "/assets/styles-CZNyd-D2.css";
 var APP_NAME = "ㅇㅁㅁㅇ";
 var Route$2 = createRootRoute({
 	head: () => ({
@@ -376,9 +377,33 @@ var createSsrRpc = (functionId) => {
 };
 var getBoard = createServerFn({ method: "GET" }).handler(createSsrRpc("8c14451dae457ac2e171179defe6369842c145c577862973196c2960056b5a59"));
 var reloadBoard = createServerFn({ method: "POST" }).handler(createSsrRpc("c20b50b61dfab16855048e96c1dbd7dab49bfa123c16e3c0754efa0768c00509"));
-var $$splitComponentImporter = () => import("./routes-Da9usD_7.mjs");
+var getPharmaBoard = createServerFn({ method: "GET" }).handler(createSsrRpc("d9b8dddb359c15f8c53d67878b580806f69853d4a2ccd860aaa047e0f5f11613"));
+var reloadPharma = createServerFn({ method: "POST" }).validator((data) => ({ companyId: data?.companyId ?? "" })).handler(createSsrRpc("81384d28ddaa14716f0e0713e938a43bf7dc53d179fb28c7c6ee2c527fa36333"));
+var storePharmaLogin = createServerFn({ method: "POST" }).validator((data) => ({
+	companyId: String(data.companyId ?? ""),
+	username: String(data.username ?? ""),
+	password: String(data.password ?? "")
+})).handler(createSsrRpc("b9abab0d616af06cc73f7f660d68ac8cf86ab98cb55e3578b9840f3c2eab6398"));
+var removePharmaLogin = createServerFn({ method: "POST" }).validator((data) => ({ companyId: String(data.companyId ?? "") })).handler(createSsrRpc("1aaab22452eef24edbc300560980af93ec4b7b7a683758d66a4f42c01107fa6a"));
+var createPharmaCompany = createServerFn({ method: "POST" }).validator((data) => ({
+	name: String(data.name ?? ""),
+	loginUrl: String(data.loginUrl ?? "")
+})).handler(createSsrRpc("fe6856b22266cbb8e418214854d8e1e8378b48c8ffc9cb9db65bdf8e65612eed"));
+var editPharmaCompany = createServerFn({ method: "POST" }).validator((data) => ({
+	companyId: String(data.companyId ?? ""),
+	name: String(data.name ?? ""),
+	loginUrl: String(data.loginUrl ?? "")
+})).handler(createSsrRpc("f08e9530d5135c704625b20f8aa980371004573ac6c6eb2a50c4c5efa07e4472"));
+var removePharmaCompany = createServerFn({ method: "POST" }).validator((data) => ({ companyId: String(data.companyId ?? "") })).handler(createSsrRpc("e5e017d455614273379fd1fb209a7a34ef1a3254cd54f5c8c92e6a9f8cffe45e"));
+var $$splitComponentImporter = () => import("./routes-DU-4HSvQ.mjs");
 var Route$1 = createFileRoute("/")({
-	loader: () => getBoard(),
+	loader: async () => {
+		const [board, pharma] = await Promise.all([getBoard(), getPharmaBoard()]);
+		return {
+			board,
+			pharma
+		};
+	},
 	component: lazyRouteComponent($$splitComponentImporter, "component")
 });
 /** 10:00 Asia/Seoul = 01:00 UTC. Vercel Cron calls this once a day. */
@@ -390,10 +415,19 @@ var Route = createFileRoute("/api/cron/collect")({ server: { handlers: { GET: as
 		if (bearer !== `Bearer ${secret}`) return new Response("unauthorized", { status: 401 });
 	} else if (!fromCron) return new Response("unauthorized", { status: 401 });
 	const board = await refreshBoard();
+	let pharmaCount = 0;
+	let pharmaError = "";
+	try {
+		pharmaCount = (await refreshPharma()).events.length;
+	} catch (error) {
+		pharmaError = error instanceof Error ? error.message : "pharma failed";
+	}
 	return Response.json({
 		ok: true,
 		collectedAt: board.collectedAt,
-		count: board.events.length
+		count: board.events.length,
+		pharmaCount,
+		pharmaError
 	});
 } } } });
 var rootRouteChildren = {
@@ -417,4 +451,4 @@ function getRouter() {
 	});
 }
 //#endregion
-export { Route$1 as n, reloadBoard as r, router_exports as t };
+export { reloadPharma as a, storePharmaLogin as c, editPharmaCompany as i, reloadBoard as l, Route$1 as n, removePharmaCompany as o, createPharmaCompany as r, removePharmaLogin as s, router_exports as t };
