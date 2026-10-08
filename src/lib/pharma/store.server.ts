@@ -1,4 +1,6 @@
 import { dbSource, getSql } from "@/lib/db";
+import { diffEventLists } from "@/lib/change-history/diff";
+import { appendChanges, recentChanges } from "@/lib/change-history/store.server";
 import { mapPool, seoulToday } from "@/lib/events/html";
 import { SEED_COMPANIES, chipLabel, type PharmaCompany } from "./companies.ts";
 import { collectCompany, describeLogin } from "./collect.ts";
@@ -110,6 +112,7 @@ function bundledPharmaBoard(): PharmaBoard {
     collectedAt: "",
     today: seoulToday(),
     events: [],
+    changes: [],
     companies: SEED_COMPANIES.map((company) => ({
       id: company.id,
       name: company.name,
@@ -186,12 +189,20 @@ export async function loadPharmaBoard(): Promise<PharmaBoard> {
     today,
     events,
     companies,
+    changes: await recentChanges("pharma"),
   };
 }
 
 async function writeEvents(companyId: string, result: { ok: boolean; message: string; events: PharmaEvent[] }) {
-  if (!result.ok) return;
+  // A failed or unexpectedly empty collection must not erase the saved list.
+  if (!result.ok || result.events.length === 0) return;
   const sql = await getSql();
+  const previousRows = await sql<EventRow>`
+    select id, company_id, title, summary, kind, conditions,
+           start_date::text as start_date, end_date::text as end_date, url
+    from pharma_events where company_id = ${companyId} and active = true
+  `;
+  const previousEvents = previousRows.map(toEvent);
   const collectedAt = new Date().toISOString();
   await sql`update pharma_events set active = false where company_id = ${companyId}`;
   for (const event of result.events) {
@@ -215,6 +226,12 @@ async function writeEvents(companyId: string, result: { ok: boolean; message: st
         collected_at = excluded.collected_at
     `;
   }
+  const changes = diffEventLists(previousEvents, result.events, [
+    ["title", "제목"], ["summary", "내용"], ["kind", "종류"],
+    ["conditions", "조건"], ["startDate", "시작일"],
+    ["endDate", "종료일"], ["url", "링크"],
+  ]);
+  await appendChanges("pharma", companyId, changes);
 }
 
 async function saveReport(updates: ReportRow[], cursor: number | null): Promise<void> {
