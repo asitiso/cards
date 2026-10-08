@@ -126,6 +126,7 @@ export function extractOffers(html: string, pageUrl: string, companyId: string, 
 }
 
 export async function describeLogin(loginUrl: string): Promise<PharmaBrowserLogin | null> {
+  if (knownLoginHost(loginUrl)) return null;
   const jar = new Map<string, string>();
   let page = await request(loginUrl, jar);
   let form = findLoginForm(page.html, page.url);
@@ -157,6 +158,19 @@ export async function collectCompany(
 ): Promise<CollectResult> {
   const jar = new Map<string, string>();
   try {
+    const known = await loginKnown(company.loginUrl, username, password, jar);
+    if (known) {
+      if (!known.ok) return { ok: false, message: known.message, events: [] };
+      const events = extractOffers(known.html, known.url, company.id, today);
+      return {
+        ok: true,
+        message:
+          events.length > 0
+            ? `로그인했습니다. 응모·할인·신제품 ${events.length}건입니다.`
+            : "로그인했지만 응모·할인·신제품을 찾지 못했습니다.",
+        events,
+      };
+    }
     let page = await request(company.loginUrl, jar);
     let form = findLoginForm(page.html, page.url);
     if (!form) {
@@ -189,7 +203,7 @@ export async function collectCompany(
     const text = stripTags(visibleMarkup(logged.html));
     if (FAIL.test(text)) return { ok: false, message: "로그인에 실패했습니다. 아이디를 확인해 주세요.", events: [] };
     const events = extractOffers(logged.html, logged.url, company.id, today);
-    if (/type=["']?password/i.test(logged.html) && events.length === 0) {
+    if (/type=["']?password/i.test(logged.html) && events.length === 0 && /login|signin/i.test(logged.url)) {
       return { ok: false, message: "로그인 화면에서 벗어나지 못했습니다.", events: [] };
     }
     if (text.length < 40 && events.length === 0) {
@@ -209,6 +223,164 @@ export async function collectCompany(
       message: error instanceof Error ? error.message : "읽지 못했습니다.",
       events: [],
     };
+  }
+}
+
+function knownLoginHost(loginUrl: string): boolean {
+  try {
+    return /(?:^|\.)(?:baropharm\.com|shop\.co\.kr|hmpmall\.co\.kr)$/i.test(new URL(loginUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+type KnownLogin = { ok: boolean; message: string; url: string; html: string };
+
+async function loginKnown(
+  loginUrl: string,
+  username: string,
+  password: string,
+  jar: Map<string, string>,
+): Promise<KnownLogin | null> {
+  let host = "";
+  try {
+    host = new URL(loginUrl).hostname;
+  } catch {
+    return null;
+  }
+  if (/(?:^|\.)baropharm\.com$/i.test(host)) return loginBaropharm(username, password, jar);
+  if (/(?:^|\.)shop\.co\.kr$/i.test(host)) return loginTheshop(username, password, jar);
+  if (/(?:^|\.)hmpmall\.co\.kr$/i.test(host)) return loginHmp(username, password, jar);
+  return null;
+}
+
+async function loginBaropharm(username: string, password: string, jar: Map<string, string>): Promise<KnownLogin> {
+  const sent = await exchange("https://api-v2.baropharm.com/auth/login", jar, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Origin: "https://www.baropharm.com",
+      Referer: "https://www.baropharm.com/",
+    },
+    body: JSON.stringify({ username, password }),
+  });
+  if (sent.status === 401 || sent.status === 403) {
+    return { ok: false, message: jsonMessage(sent.html) || "아이디 또는 비밀번호를 확인해 주세요.", url: sent.url, html: "" };
+  }
+  if (sent.status >= 400) return { ok: false, message: `바로팜 로그인에 실패했습니다. (${sent.status})`, url: sent.url, html: "" };
+  const home = await exchange("https://app.baropharm.com/", jar);
+  return { ok: true, message: "로그인했습니다.", url: home.url, html: home.html };
+}
+
+async function loginTheshop(username: string, password: string, jar: Map<string, string>): Promise<KnownLogin> {
+  await exchange("https://www.shop.co.kr/front/intro/login", jar);
+  const sent = await exchange("https://www.shop.co.kr/front/api/auth/mimsLogin", jar, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Origin: "https://www.shop.co.kr",
+      Referer: "https://www.shop.co.kr/front/intro/login",
+    },
+    body: JSON.stringify({
+      identifier: username,
+      password,
+      clientIP: "127.0.0.1",
+      redirectUrl: "https://www.shop.co.kr/front/theshop/main/main",
+    }),
+  });
+  let payload: { code?: string; data?: string; message?: string } = {};
+  try {
+    payload = JSON.parse(sent.html) as { code?: string; data?: string; message?: string };
+  } catch {
+    payload = {};
+  }
+  if (sent.status >= 400 || payload.code === "FAIL") {
+    return { ok: false, message: "아이디 또는 비밀번호를 확인해 주세요.", url: sent.url, html: "" };
+  }
+  const next = typeof payload.data === "string" && /^https?:/i.test(payload.data) ? payload.data : "https://www.shop.co.kr/front/theshop/main/main";
+  const home = await exchange(next, jar);
+  return { ok: true, message: "로그인했습니다.", url: home.url, html: home.html };
+}
+
+async function loginHmp(username: string, password: string, jar: Map<string, string>): Promise<KnownLogin> {
+  await exchange("https://www.hmpmall.co.kr/login.do", jar);
+  const generated = await exchange("https://www.hmpmall.co.kr/dwr/call/plaincall/__System.generateId.dwr", jar, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain", Referer: "https://www.hmpmall.co.kr/login.do" },
+    body: dwrBody({ script: "__System", method: "generateId", session: "", batchId: "0" }),
+  });
+  const token = /handleCallback\("[^"]+","[^"]+","([^"]+)"\)/.exec(generated.html)?.[1] ?? "";
+  if (!token) return { ok: false, message: "HMP 로그인 세션을 열지 못했습니다.", url: generated.url, html: "" };
+  jar.set("DWRSESSIONID", token);
+  const sent = await exchange("https://www.hmpmall.co.kr/dwr/call/plaincall/common/Login.execute.dwr", jar, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain", Referer: "https://www.hmpmall.co.kr/login.do", Origin: "https://www.hmpmall.co.kr" },
+    body: dwrBody({
+      script: "common/Login",
+      method: "execute",
+      session: `${token}/1`,
+      batchId: "1",
+      params: { memId: username, memPw: password, loginPathDivCode: "2350001" },
+    }),
+  });
+  if (/CSRF Security Error/.test(sent.html)) return { ok: false, message: "HMP 로그인 확인에 실패했습니다.", url: sent.url, html: "" };
+  const received = /isReceived\s*:\s*(true|false)/.exec(sent.html)?.[1] === "true";
+  const message = dwrMessage(sent.html);
+  if (!received) return { ok: false, message: message || "아이디 또는 비밀번호를 확인해 주세요.", url: sent.url, html: "" };
+  const home = await exchange("https://www.hmpmall.co.kr/home.do", jar, {
+    headers: { Referer: "https://www.hmpmall.co.kr/login.do" },
+  });
+  return { ok: true, message: "로그인했습니다.", url: home.url, html: home.html };
+}
+
+function dwrBody(input: {
+  script: string;
+  method: string;
+  session: string;
+  batchId: string;
+  params?: Record<string, string>;
+}): string {
+  const lines = [
+    "callCount=1",
+    "windowName=",
+    `c0-scriptName=${input.script}`,
+    `c0-methodName=${input.method}`,
+    "c0-id=0",
+    `batchId=${input.batchId}`,
+    "instanceId=0",
+    "page=%2Flogin.do",
+    `scriptSessionId=${input.session}`,
+  ];
+  const params = input.params ?? {};
+  const names = Object.keys(params);
+  if (names.length > 0) {
+    const refs = names.map((name, index) => `${encodeURIComponent(name)}:reference:c0-e${index + 1}`);
+    lines.push(`c0-param0=Object_Object:{${refs.join(", ")}}`);
+    names.forEach((name, index) => {
+      lines.push(`c0-e${index + 1}=string:${encodeURIComponent(params[name] ?? "")}`);
+    });
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+function dwrMessage(text: string): string {
+  const raw = /message\s*:\s*"((?:\\.|[^"\\])*)"/.exec(text)?.[1] ?? "";
+  if (!raw) return "";
+  try {
+    return JSON.parse(`"${raw}"`).replace(/\s+/g, " ").trim();
+  } catch {
+    return raw;
+  }
+}
+
+function jsonMessage(text: string): string {
+  try {
+    const payload = JSON.parse(text) as { message?: string };
+    return typeof payload.message === "string" ? payload.message : "";
+  } catch {
+    return "";
   }
 }
 
@@ -258,6 +430,16 @@ async function request(
   jar: Map<string, string>,
   init: RequestInit = {},
 ): Promise<{ url: string; html: string }> {
+  const page = await exchange(url, jar, init);
+  if (page.status >= 400) throw new Error(`${page.status} ${page.url}`);
+  return page;
+}
+
+async function exchange(
+  url: string,
+  jar: Map<string, string>,
+  init: RequestInit = {},
+): Promise<{ status: number; url: string; html: string }> {
   let current = url;
   let method = init.method ?? "GET";
   let body = init.body;
@@ -272,7 +454,7 @@ async function request(
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
         "Accept-Language": "ko-KR,ko;q=0.9",
-        Accept: "text/html,application/xhtml+xml,*/*;q=0.8",
+        Accept: "text/html,application/xhtml+xml,application/json,*/*;q=0.8",
         Cookie: [...jar.entries()].map(([key, value]) => `${key}=${value}`).join("; "),
         ...(extra ?? {}),
       },
@@ -299,10 +481,7 @@ async function request(
       utf8.includes("\uFFFD") || /charset=euc-kr/i.test(utf8.slice(0, 400))
         ? new TextDecoder("euc-kr").decode(buffer)
         : utf8;
-    if (!response.ok && response.status !== 200) {
-      throw new Error(`${response.status} ${current}`);
-    }
-    return { url: current, html };
+    return { status: response.status, url: current, html };
   }
   throw new Error("로그인이 너무 많이 이동했습니다.");
 }
