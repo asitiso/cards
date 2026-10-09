@@ -13,6 +13,7 @@ import {
 import { issuerMeta, type EntryEvent, type IssuerId } from "./types.ts";
 import { collectMarkets } from "./market-collect.ts";
 import { validateCollection } from "./quality.ts";
+import { wooriDetailUrl, wooriListCondition } from "./woori-details.ts";
 
 export type CollectHit = {
   issuer: IssuerId;
@@ -878,7 +879,7 @@ async function collectWoori(today: string): Promise<CollectHit> {
     const events = rows
       .map((item) => {
         const title = stripTags(item.cardEvntNm || "").replace(/\s+/g, " ").trim();
-        const summary = stripTags(item.evntSumTxt || "").replace(/\s+/g, " ").trim();
+        const summary = stripTags((item.evntSumTxt || "").replace(/&lt;br\s*\/?&gt;/gi, "\n")).replace(/\s+/g, " ").trim();
         const start = dottedDay(item.evntSdt || "");
         const end = dottedDay(item.evntEdt || "");
         if (!item.evntSrno || title.length < 4 || !end || (start && start > today) || !isOngoing(end, today)) return null;
@@ -887,12 +888,16 @@ async function collectWoori(today: string): Promise<CollectHit> {
           title,
           summary: summary || title,
           benefit: (summary || title).slice(0, 80),
-          conditions: [summary || "대상과 제외 조건은 카드사 화면에서 확인하세요."],
+          // A reward blurb is not automatically a participation condition.
+          // Terms will only be populated when the source states a specific rule.
+          conditions: wooriListCondition(summary),
           exclusions: [],
           startDate: start || today,
           endDate: end,
-          applyUrl: listUrl,
+          applyUrl: wooriDetailUrl(item.evntSrno),
           entry,
+          // The public HTML is a client-side shell, not verified detail content.
+          detailUnverified: true,
         });
       })
       .filter((event): event is EntryEvent => event !== null);
