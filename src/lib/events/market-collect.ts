@@ -2,6 +2,7 @@ import { fetchText, isOngoing, mapPool, splitRules, stripTags, visibleMarkup, ym
 import { ISSUERS, issuerMeta, type EntryEvent, type IssuerId } from "./types.ts";
 import type { CollectHit } from "./http-collect.ts";
 import { findDatedEventLinks, findEventIndexPages, stableLinkId } from "./discover.ts";
+import { collectPublicBank } from "./bank-public-collect.ts";
 
 const ENTRY = /응모|쿠폰|추첨|이벤트\s*신청|신청\s*필수|신청하기|참여\s*신청/;
 
@@ -759,6 +760,8 @@ async function collectHanaBank(today: string): Promise<CollectHit> {
 }
 
 const SPECIAL: Partial<Record<IssuerId, (today: string) => Promise<CollectHit>>> = {
+  kakaobank: (today) => collectPublicBank("kakaobank", today),
+  kbank: (today) => collectPublicBank("kbank", today),
   mirae: collectMirae,
   samsungsec: collectSamsungSec,
   hanasec: collectHanaSec,
