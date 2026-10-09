@@ -11,12 +11,12 @@ test("NH Bank promotions require exact matching official period",()=>{
  assert.equal(verifyNewOfficialPromotion("nhbank",item,page.replace("10월 31일까지","9월 30일까지"),"2026-10-09"),null);
 });
 test("do not count stale promotions after expiry",()=>{
- const item=PUBLIC_PROMOTIONS.nhbank[2];
+ const item=PUBLIC_PROMOTIONS.nhbank.find(p=>p.title.includes("청약행운"))!;
  const page="<div>가을혜택이 우수수, 청약행운이 와르르! 9월 1일부터 10월 31일까지 이벤트</div>";
  assert.equal(verifyNewOfficialPromotion("nhbank",item,page,"2026-11-01"),null);
 });
 test("NH Securities ISA fee reduction is not an application-required event",()=>{
- const item=PUBLIC_PROMOTIONS.nhsec[0];
+ const item=PUBLIC_PROMOTIONS.nhsec.find(p=>p.title.includes("ISA"))!;
  const page="<div>중개형 ISA 시작은 나무로! 기간 : 2026.02.01~2027.01.31</div>";
  const valid=verifyNewOfficialPromotion("nhsec",item,page,"2026-10-09");
  assert.equal(valid?.entry,false);
