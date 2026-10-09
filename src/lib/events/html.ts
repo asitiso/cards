@@ -94,8 +94,16 @@ export function linesFrom(text: string): string[] {
   return lines;
 }
 
+/** Avoid mistaking navigation, Vue/Angular templates, and search utilities for
+ * actual promotion terms. Never fabricate reward or exclusion requirements. */
+export function isBoilerplateRule(line: string): boolean {
+  return /\{\{|\}\}|<%|%>|\$\{|__NEXT_DATA__|(?:v-bind|ng-if)=/i.test(line) ||
+    /(?:개인신용정보이용\/제공내역조회|계좌통합관리\/오픈뱅킹|마이데이터이용제한|예약\/기간예약주문내역|ELW\s*기간등락률|전체메뉴|메뉴바로가기|고객센터\s*바로가기|장바구니|지점찾기|서비스\s*이용약관)/i.test(line) ||
+    /^(?:마이페이지|개인정보처리방침|서비스 이용약관|처리방침|고객센터|문의하기|공지사항|메인으로|본문바로가기|홈으로)(?:\s|$)/i.test(line);
+}
+
 export function splitRules(text: string): { conditions: string[]; exclusions: string[] } {
-  const lines = linesFrom(text);
+  const lines = linesFrom(text).filter((line) => !isBoilerplateRule(line));
   const exclusions = lines
     .filter((line) => /제외|불가|않을 경우|않은 경우|중복|조기 종료/.test(line))
     .slice(0, 4);
