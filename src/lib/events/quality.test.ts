@@ -51,3 +51,14 @@ test("unverified list result must not erase previously checked event terms",asyn
  assert.equal(mergeUnverifiedDetails(old,{...weak,title:"새로운 행사"})?.conditions[0],weak.conditions[0]);
  assert.equal(mergeUnverifiedDetails(old,{...weak,detailUnverified:false})?.entry,false);
 });
+
+
+test("Woori Card list-only reward copy is not retained as an eligibility requirement",async()=>{
+  const {mergeUnverifiedDetails}=await import("./quality.ts");
+  const previous={...base,id:"woori:30006298",issuer:"woori" as const,
+    title:"2026 우리카드 캐시백 이벤트",summary:"최대 20만원 캐시백",
+    benefit:"최대 20만원 캐시백",conditions:["최대 20만원 캐시백"],exclusions:[]};
+  const incoming={...previous,applyUrl:"https://pc.wooricard.com/dcpc/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno=30006298",
+    conditions:[],detailUnverified:true};
+  assert.deepEqual(mergeUnverifiedDetails(previous,incoming).conditions,[]);
+});
