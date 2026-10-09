@@ -12,6 +12,7 @@ import {
 } from "./html.ts";
 import { issuerMeta, type EntryEvent, type IssuerId } from "./types.ts";
 import { collectMarkets } from "./market-collect.ts";
+import { validateCollection } from "./quality.ts";
 
 export type CollectHit = {
   issuer: IssuerId;
@@ -931,5 +932,5 @@ export async function collectLive(today = seoulToday()): Promise<CollectHit[]> {
     ]),
     collectMarkets(today),
   ]);
-  return [...cards, ...markets];
+  return [...cards, ...markets].map(validateCollection);
 }
