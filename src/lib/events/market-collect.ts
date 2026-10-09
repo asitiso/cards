@@ -6,6 +6,7 @@ import { collectPublicBroker } from "./broker-public-collect.ts";
 import { collectNewOfficialSource } from "./official-public-sources.ts";
 import { collectTossSecurities } from "./tosssec-collect.ts";
 import { collectPublicBank } from "./bank-public-collect.ts";
+import { daishinDetailIsUnverified } from "./daishin-detail.ts";
 
 const ENTRY = /응모|쿠폰|추첨|이벤트\s*신청|신청\s*필수|신청하기|참여\s*신청/;
 
@@ -105,10 +106,7 @@ async function keepIfEntry(
   }
   try {
     const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8000));
-    if (issuer === "daishin" && (
-      /\{\{\s*(?:event\.|yymmddhhmm\()/i.test(text) ||
-      !text.includes(title)
-    )) {
+    if (issuer === "daishin" && daishinDetailIsUnverified(text, title)) {
       // Daishin's public server sometimes returns an unrendered Vue shell.
       // Do not attach the global navigation, generic warnings, or template
       // placeholders to an unrelated promotion's eligibility requirements.
