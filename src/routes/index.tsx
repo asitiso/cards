@@ -1,18 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
-import { getBoard, reloadBoard } from "@/lib/events/board.functions";
+import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { getBoard, getFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
-import { PharmaScreen } from "@/components/pharma-screen";
+import type { PharmaBoard } from "@/lib/pharma/types";
 import { ChangeHistory } from "@/components/change-history";
 import { getPharmaBoard } from "@/lib/pharma/board.functions";
 
+// The first paint must never wait for a tab that is not visible.
+const PharmaScreen = lazy(() =>
+  import("@/components/pharma-screen").then((module) => ({ default: module.PharmaScreen })),
+);
+
 export const Route = createFileRoute("/")({
-  loader: async () => {
-    const [board, pharma] = await Promise.all([getBoard(), getPharmaBoard()]);
-    return { board, pharma };
-  },
+  loader: async () => ({ board: await getBoard() }),
   component: Home,
 });
 
@@ -20,6 +22,9 @@ function Home() {
   const data = Route.useLoaderData();
   const [board, setBoard] = useState<Board>(data.board);
   const [desk, setDesk] = useState<"finance" | "pharma">("finance");
+  const [pharma, setPharma] = useState<PharmaBoard | null>(null);
+  const [pharmaLoading, setPharmaLoading] = useState(false);
+  const [pharmaError, setPharmaError] = useState("");
   const [market, setMarket] = useState<Market>("card");
   const [issuer, setIssuer] = useState<IssuerId | "all">("all");
   const [sort, setSort] = useState<"soon" | "new">("soon");
@@ -84,8 +89,43 @@ function Home() {
     }
   }
 
+  async function openPharma() {
+    setDesk("pharma");
+    if (pharma || pharmaLoading) return;
+    setPharmaLoading(true);
+    setPharmaError("");
+    try {
+      setPharma(await getPharmaBoard());
+    } catch (err) {
+      setPharmaError(err instanceof Error ? err.message : "제약사 화면을 불러오지 못했습니다.");
+    } finally {
+      setPharmaLoading(false);
+    }
+  }
+
   if (desk === "pharma") {
-    return <PharmaScreen initial={data.pharma} onFinance={() => setDesk("finance")} />;
+    if (pharma) {
+      return (
+        <Suspense fallback={<p className="p-6 text-sm text-muted">제약사 화면 준비 중입니다.</p>}>
+          <PharmaScreen initial={pharma} onFinance={() => setDesk("finance")} />
+        </Suspense>
+      );
+    }
+    return (
+      <main className="mx-auto min-h-screen w-full max-w-5xl px-3 py-3 sm:px-6 sm:py-6">
+        <button type="button" onClick={() => setDesk("finance")} className="text-sm font-medium text-muted">
+          ← 금융 행사로 돌아가기
+        </button>
+        <p role="status" className="mt-5 text-sm text-muted">
+          {pharmaLoading ? "제약사 화면을 불러오는 중입니다." : pharmaError || "제약사 화면을 준비하고 있습니다."}
+        </p>
+        {pharmaError ? (
+          <button type="button" onClick={() => void openPharma()} className="mt-3 rounded-full border border-line px-4 py-2 text-sm">
+            다시 시도
+          </button>
+        ) : null}
+      </main>
+    );
   }
 
   return (
@@ -95,7 +135,7 @@ function Home() {
           <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅇㅁㅁㅇ</h1>
           <button
             type="button"
-            onClick={() => setDesk("pharma")}
+            onClick={() => void openPharma()}
             className="shrink-0 text-2xl font-medium tracking-tight text-muted"
           >
             ㅈㅇㅅ
@@ -119,7 +159,7 @@ function Home() {
 
       {error ? <p className="mt-2 text-sm text-accent">{error}</p> : null}
 
-      <ChangeHistory changes={board.changes} sourceName={issuerName} />
+      <ChangeHistory key={board.collectedAt} changes={board.changes} loadChanges={getFinanceChanges} sourceName={issuerName} />
 
       <div className="mt-3 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5" role="tablist" aria-label="종류">
         {MARKETS.map((item) => {

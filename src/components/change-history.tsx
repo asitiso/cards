@@ -7,22 +7,49 @@ const ACTION_NAMES = { added: "신규", updated: "변경", removed: "목록 제�
 export function ChangeHistory({
   changes,
   sourceName,
+  loadChanges,
 }: {
   changes: readonly ChangeRecord[];
   sourceName: (sourceId: string) => string;
+  loadChanges?: () => Promise<ChangeRecord[]>;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [visibleChanges, setVisibleChanges] = useState<readonly ChangeRecord[]>(changes);
+  const [loaded, setLoaded] = useState(!loadChanges);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  // Without a lazy loader (for example on the pharma screen), props stay authoritative.
+  const currentChanges = loadChanges ? visibleChanges : changes;
+
+  async function toggle() {
+    if (expanded) {
+      setExpanded(false);
+      return;
+    }
+    setExpanded(true);
+    if (!loadChanges || loaded || loading) return;
+    setLoading(true);
+    setError("");
+    try {
+      setVisibleChanges(await loadChanges());
+      setLoaded(true);
+    } catch {
+      setError("변경목록을 불러오지 못했습니다. 닫았다가 다시 열어 주세요.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <section className="mt-3 overflow-hidden rounded-2xl border border-line bg-card">
       <button
         type="button"
-        onClick={() => setExpanded((value) => !value)}
+        onClick={() => void toggle()}
         aria-expanded={expanded}
         className="flex min-h-10 w-full items-center justify-between gap-3 px-3 text-left"
       >
         <span className="text-sm font-semibold">
-          변경목록 <span className="font-normal text-muted">최근 {changes.length}건</span>
+          변경목록 <span className="font-normal text-muted">{loaded ? `최근 ${currentChanges.length}건` : "최근 기록"}</span>
         </span>
         <span className="flex items-center gap-1 text-xs text-muted">
           자동 기록
@@ -30,9 +57,13 @@ export function ChangeHistory({
         </span>
       </button>
       {expanded ? (
-        changes.length ? (
+        loading ? (
+          <p role="status" className="border-t border-line px-3 py-4 text-sm text-muted">변경목록을 불러오는 중입니다.</p>
+        ) : error ? (
+          <p role="alert" className="border-t border-line px-3 py-4 text-sm text-accent">{error}</p>
+        ) : currentChanges.length ? (
           <ul className="divide-y divide-line border-t border-line">
-            {changes.map((change) => (
+            {currentChanges.map((change) => (
               <li key={change.id} className="flex items-start gap-2 px-3 py-2">
                 <span className="mt-0.5 shrink-0 rounded-md bg-paper px-1.5 py-0.5 text-[11px] font-medium text-ink">
                   {ACTION_NAMES[change.action]}
