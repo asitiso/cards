@@ -46,7 +46,9 @@ export function verifiedTossPressEvent(
 ): EntryEvent | null {
   const text = stripTags(visibleMarkup(html)).replace(/\s+/g, " ").trim();
   const keyTerms = link.title.replace(/토스증권|이벤트|프로모션|고객|진행|대상|제휴/g, " ")
-    .split(/[\s·,]+/).filter((word) => word.length >= 3);
+    .split(/[\s·,]+/)
+    .map((word) => word.replace(/(?:에서|으로|과|와|의|은|는|을|를|로)$/, ""))
+    .filter((word) => word.length >= 3);
   if (!keyTerms.length || !keyTerms.some((word) => text.includes(word))) return null;
   const periodPart = text.match(/(?:이벤트|행사|프로모션)\s*기간\s*[:：]?\s*([^\n]{0,130})/i)?.[1];
   if (!periodPart) return null;
