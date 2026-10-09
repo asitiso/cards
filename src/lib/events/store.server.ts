@@ -1,6 +1,6 @@
 import { getSql, dbSource } from "@/lib/db";
 import { diffEventLists } from "@/lib/change-history/diff";
-import { suddenDrop, suspiciousMissingOngoing } from "./quality";
+import { suddenDrop, suspiciousMissingOngoing, mergeUnverifiedDetails } from "./quality";
 import { appendChanges } from "@/lib/change-history/store.server";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
@@ -266,8 +266,12 @@ export async function refreshBoard(): Promise<Board> {
       hit.events = [];
       continue;
     }
+    const previousById = new Map(previousEvents.map((event) => [event.id, event]));
+    const confirmedEvents = hit.events.map((event) =>
+      mergeUnverifiedDetails(previousById.get(event.id), event),
+    );
     await sql`update entry_events set active = false where issuer = ${hit.issuer}`;
-    for (const event of hit.events) {
+    for (const event of confirmedEvents) {
       await sql`
         insert into entry_events (
           id, issuer, title, summary, benefit, conditions, exclusions,
@@ -294,7 +298,7 @@ export async function refreshBoard(): Promise<Board> {
       `;
     }
     // The collection type makes entry optional; the database stores true by default.
-    const normalizedEvents = hit.events.map((event) => ({ ...event, entry: event.entry !== false }));
+    const normalizedEvents = confirmedEvents.map((event) => ({ ...event, entry: event.entry !== false }));
     const changes = diffEventLists(previousEvents, normalizedEvents, [
       ["title", "제목"], ["summary", "내용"], ["benefit", "혜택"],
       ["conditions", "조건"], ["exclusions", "유의사항"], ["startDate", "시작일"],
