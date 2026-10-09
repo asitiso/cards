@@ -95,7 +95,14 @@ async function keepIfEntry(
   applyUrl: string,
 ): Promise<EntryEvent> {
   const preview = `${title} ${blurb}`;
-  if (isEntry(preview)) return eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl, true);
+  if (isEntry(preview)) {
+    // The list already proves participation, but NOT the detailed eligibility
+    // and exclusions. Never overwrite previously verified terms from this.
+    return {
+      ...eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl, true),
+      detailUnverified: true,
+    };
+  }
   try {
     const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8000));
     const entry = isEntry(text);
@@ -116,7 +123,10 @@ async function keepIfEntry(
     if (rules.exclusions.length) result.exclusions = rules.exclusions;
     return result;
   } catch {
-    return eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, false);
+    return {
+      ...eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, isEntry(preview)),
+      detailUnverified: true,
+    };
   }
 }
 
