@@ -105,6 +105,22 @@ async function keepIfEntry(
   }
   try {
     const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8000));
+    if (issuer === "daishin" && (
+      /\{\{\s*(?:event\.|yymmddhhmm\()/i.test(text) ||
+      !text.includes(title)
+    )) {
+      // Daishin's public server sometimes returns an unrendered Vue shell.
+      // Do not attach the global navigation, generic warnings, or template
+      // placeholders to an unrelated promotion's eligibility requirements.
+      const fallback = eventOf(
+        issuer, externalId, title, tidy(blurb) || title,
+        start, end, applyUrl, isEntry(preview),
+      );
+      fallback.conditions = [];
+      fallback.exclusions = [];
+      fallback.detailUnverified = true;
+      return fallback;
+    }
     const entry = isEntry(text);
     const result = eventOf(
       issuer,
@@ -123,10 +139,12 @@ async function keepIfEntry(
     if (rules.exclusions.length) result.exclusions = rules.exclusions;
     return result;
   } catch {
-    return {
-      ...eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, isEntry(preview)),
-      detailUnverified: true,
-    };
+    const fallback = eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, isEntry(preview));
+    if (issuer === "daishin") {
+      fallback.conditions = [];
+      fallback.exclusions = [];
+    }
+    return { ...fallback, detailUnverified: true };
   }
 }
 
@@ -651,7 +669,7 @@ async function collectDaishin(today: string): Promise<CollectHit> {
       issuer,
       ok: true,
       message: events.length
-        ? `진행 중인 이벤트 ${events.length}건입니다.`
+        ? `진행 중인 이벤트 ${events.length}건입니다. 상세 조건 확인이 필요한 행사 ${events.filter((event) => event.detailUnverified).length}건.`
         : "이벤트 목록은 열렸지만 오늘 진행 중인 건이 없습니다.",
       events,
     };
