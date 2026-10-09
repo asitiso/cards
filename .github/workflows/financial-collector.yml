@@ -24,3 +24,4 @@ jobs:
       - run: npm install --no-package-lock --no-audit --no-fund
       - run: node --experimental-strip-types --test src/lib/events/quality.test.ts src/lib/events/discover.test.ts src/lib/events/html.test.ts src/lib/events/bank-public-collect.test.ts src/lib/change-history/diff.test.ts
       - run: npm run typecheck
+      - run: node --experimental-strip-types scripts/check-public-bank-sources.mjs
