@@ -29,6 +29,13 @@ function Home() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
+  const selectedIssuerReport = issuer === "all"
+    ? undefined
+    : board.issuers.find((item) => item.id === issuer);
+  const uncheckedIssuers = board.issuers.filter(
+    (item) => issuerMeta(item.id).market === market && !item.ok,
+  );
+
   const scoped = useMemo(
     () => board.events.filter((event) => matchesScope(event, scope)),
     [board.events, scope],
@@ -202,12 +209,30 @@ function Home() {
           return (
             <Chip key={item.id} active={issuer === item.id} onClick={() => setIssuer(item.id)}>
               {item.short} {count}
+              {count === 0 && board.issuers.find((report) => report.id === item.id)?.ok === false
+                ? <span className="text-accent" aria-label="수집 확인 필요"> · 확인</span>
+                : null}
             </Chip>
           );
         })}
       </div>
 
-      <p className="mt-2 text-xs text-muted">{visible.length}건</p>
+      <p className="mt-2 text-xs text-muted">
+        {visible.length}건
+        {issuer === "all" && uncheckedIssuers.length > 0
+          ? ` · 수집 확인 필요 ${uncheckedIssuers.length}곳`
+          : null}
+      </p>
+
+      {selectedIssuerReport && !selectedIssuerReport.ok ? (
+        <div role="status" className="mt-2 rounded-xl border border-line bg-card px-3 py-2 text-xs leading-relaxed">
+          <span className="font-semibold text-accent">수집 확인 필요</span>
+          <span className="ml-2 text-muted">{selectedIssuerReport.message}</span>
+          {selectedIssuerReport.count === 0 ? (
+            <p className="mt-1 text-muted">0건은 실제로 행사가 없다는 뜻이 아닙니다.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {visible.length === 0 ? (
         <p className="mt-2 rounded-2xl border border-dashed border-line bg-card px-4 py-6 text-center text-sm text-muted">
@@ -215,7 +240,9 @@ function Home() {
             ? "이 종류에서 응모 이벤트가 없습니다."
             : scope === "other"
               ? "이 종류에서 응모가 아닌 이벤트가 없습니다."
-              : "이 종류에서 이벤트가 없습니다. 다시 수집하면 전체 행사를 가져옵니다."}
+              : selectedIssuerReport && !selectedIssuerReport.ok
+                ? "공개 행사 확인이 필요합니다. 0건은 행사 없음으로 확정된 결과가 아닙니다."
+                : "현재 확인된 이벤트가 없습니다."}
         </p>
       ) : (
         <ul className="mt-1.5 overflow-hidden rounded-2xl border border-line bg-card">
@@ -242,6 +269,7 @@ function Home() {
                 <p className="text-sm font-medium leading-snug">
                   {item.name}
                   <span className="ml-2 font-normal tabular-nums text-muted">{item.count}건</span>
+                  {!item.ok ? <span className="ml-2 text-xs font-medium text-accent">확인 필요</span> : null}
                 </p>
                 <p className="truncate text-xs leading-snug text-muted">{item.message}</p>
               </div>

@@ -241,7 +241,7 @@ export const ISSUERS: IssuerMeta[] = [
     id: "tosssec",
     name: "토스증권",
     short: "토스",
-    listUrl: "https://www.tossinvest.com/",
+    listUrl: "https://corp.tossinvest.com/ko/news-room",
     market: "securities",
     androidPackage: "viva.republica.toss",
     iosAppId: "839333328",
