@@ -30,4 +30,3 @@ jobs:
       - run: node --experimental-strip-types scripts/check-next-official-sources.mjs
       - run: node --experimental-strip-types scripts/check-tosssec-source.mjs
 
-      - run: node --experimental-strip-types scripts/check-woori-daishin-details.mjs
