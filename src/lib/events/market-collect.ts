@@ -1,4 +1,4 @@
-import { fetchText, isOngoing, mapPool, stripTags, visibleMarkup, ymd } from "./html.ts";
+import { fetchText, isOngoing, mapPool, splitRules, stripTags, visibleMarkup, ymd } from "./html.ts";
 import { ISSUERS, issuerMeta, type EntryEvent, type IssuerId } from "./types.ts";
 import type { CollectHit } from "./http-collect.ts";
 import { findDatedEventLinks, findEventIndexPages, stableLinkId } from "./discover.ts";
@@ -21,7 +21,7 @@ function eventOf(
     issuer,
     title,
     summary: line,
-    benefit: entry ? "응모·쿠폰·추첨" : "자동 적용·안내",
+    benefit: line !== title && line.length >= 12 ? line.slice(0, 80) : (entry ? "원문에서 혜택 확인" : "원문에서 조건 확인"),
     conditions: [line],
     exclusions: [],
     startDate,
@@ -95,7 +95,7 @@ async function keepIfEntry(
   try {
     const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8000));
     const entry = isEntry(text);
-    return eventOf(
+    const result = eventOf(
       issuer,
       externalId,
       title,
@@ -105,6 +105,12 @@ async function keepIfEntry(
       applyUrl,
       entry,
     );
+    // Extract only terms present on the official detail page; no invented
+    // eligibility, exclusions or reward amounts.
+    const rules = splitRules(text);
+    if (rules.conditions.length) result.conditions = rules.conditions;
+    if (rules.exclusions.length) result.exclusions = rules.exclusions;
+    return result;
   } catch {
     return eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, false);
   }
