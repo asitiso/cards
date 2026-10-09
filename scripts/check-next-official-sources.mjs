@@ -25,4 +25,7 @@ for(const issuer of ids.filter(id=>!results.find(r=>r.issuer===id)?.ok)){
   }
 }
 if(!verified) {console.error("No verified live promotional source: block release.");process.exitCode=1;}
+const required=["shinhanbank","tossbank","nhsec"];
+const failed=required.filter(id=>!results.find(r=>r.issuer===id)?.ok);
+if(failed.length){console.error("Release blocked: live verified promotion not found for "+failed.join(", "));process.exitCode=1;}
 if(verified<ids.length) console.warn("Incomplete coverage: do not claim zero-hit sources fixed.");
