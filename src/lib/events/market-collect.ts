@@ -762,6 +762,8 @@ async function collectHanaBank(today: string): Promise<CollectHit> {
 }
 
 const SPECIAL: Partial<Record<IssuerId, (today: string) => Promise<CollectHit>>> = {
+  shinhanbank: (today) => collectNewOfficialSource("shinhanbank", today),
+  tossbank: (today) => collectNewOfficialSource("tossbank", today),
   nhbank: (today) => collectNewOfficialSource("nhbank", today),
   nhsec: (today) => collectNewOfficialSource("nhsec", today),
   kakaopaysec: (today) => collectNewOfficialSource("kakaopaysec", today),
