@@ -18,6 +18,8 @@ export function ChangeHistory({
   const [loaded, setLoaded] = useState(!loadChanges);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Without a lazy loader (for example on the pharma screen), props stay authoritative.
+  const currentChanges = loadChanges ? visibleChanges : changes;
 
   async function toggle() {
     if (expanded) {
@@ -47,7 +49,7 @@ export function ChangeHistory({
         className="flex min-h-10 w-full items-center justify-between gap-3 px-3 text-left"
       >
         <span className="text-sm font-semibold">
-          변경목록 <span className="font-normal text-muted">{loaded ? `최근 ${visibleChanges.length}건` : "최근 기록"}</span>
+          변경목록 <span className="font-normal text-muted">{loaded ? `최근 ${currentChanges.length}건` : "최근 기록"}</span>
         </span>
         <span className="flex items-center gap-1 text-xs text-muted">
           자동 기록
@@ -59,9 +61,9 @@ export function ChangeHistory({
           <p role="status" className="border-t border-line px-3 py-4 text-sm text-muted">변경목록을 불러오는 중입니다.</p>
         ) : error ? (
           <p role="alert" className="border-t border-line px-3 py-4 text-sm text-accent">{error}</p>
-        ) : visibleChanges.length ? (
+        ) : currentChanges.length ? (
           <ul className="divide-y divide-line border-t border-line">
-            {visibleChanges.map((change) => (
+            {currentChanges.map((change) => (
               <li key={change.id} className="flex items-start gap-2 px-3 py-2">
                 <span className="mt-0.5 shrink-0 rounded-md bg-paper px-1.5 py-0.5 text-[11px] font-medium text-ink">
                   {ACTION_NAMES[change.action]}
