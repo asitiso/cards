@@ -1,4 +1,4 @@
-import { fetchText, isOngoing, mapPool, stripTags, visibleMarkup } from "./html.ts";
+import { fetchText, isOngoing, mapPool, stripTags, visibleMarkup, ymd } from "./html.ts";
 import { ISSUERS, issuerMeta, type EntryEvent, type IssuerId } from "./types.ts";
 import type { CollectHit } from "./http-collect.ts";
 
@@ -543,13 +543,233 @@ async function collectGeneric(issuer: IssuerId, today: string): Promise<CollectH
   }
 }
 
+async function collectKoreaInvest(today: string): Promise<CollectHit> {
+  const issuer = "koreainvest" as const;
+  const listUrl = issuerMeta(issuer).listUrl;
+  try {
+    const pages = await Promise.all(
+      [1, 2, 3].map((page) =>
+        fetchText(
+          page === 1 ? listUrl : `${listUrl}&cmd=TF04gb010001&currentPage=${page}`,
+          {},
+          12000,
+        ).catch(() => ""),
+      ),
+    );
+    const seen = new Set<string>();
+    const rows: { id: string; title: string; blurb: string; start: string; end: string }[] = [];
+    for (const html of pages) {
+      for (const match of html.matchAll(
+        /doView\('(\d+)'\)[\s\S]{0,800}?class="title">([^<]+)<\/p>[\s\S]{0,400}?class="con">([^<]*)<\/p>[\s\S]{0,300}?(\d{4})\.(\d{2})\.(\d{2})[\s\S]{0,40}?(\d{4})\.(\d{2})\.(\d{2})/g,
+      )) {
+        const id = match[1];
+        if (seen.has(id)) continue;
+        const title = tidy(match[2]);
+        const start = `${match[4]}-${match[5]}-${match[6]}`;
+        const end = `${match[7]}-${match[8]}-${match[9]}`;
+        if (title.length < 4 || !isOngoing(end, today) || start > today) continue;
+        seen.add(id);
+        rows.push({ id, title, blurb: tidy(match[3]), start, end });
+      }
+    }
+    const events = (
+      await mapPool(rows, 4, (row) =>
+        keepIfEntry(
+          issuer,
+          row.id,
+          row.title,
+          row.blurb,
+          row.start,
+          row.end,
+          `https://www.truefriend.com/main/customer/notice/Event.jsp?gubun=i&cmd=TF04gb010002&currentPage=1&num=${row.id}`,
+        ),
+      )
+    ).filter((event): event is EntryEvent => event !== null);
+    return {
+      issuer,
+      ok: true,
+      message: events.length
+        ? `진행 중인 이벤트 ${events.length}건입니다.`
+        : "진행 중 이벤트 목록은 열렸지만 오늘 진행 중인 건이 없습니다.",
+      events,
+    };
+  } catch (error) {
+    return {
+      issuer,
+      ok: false,
+      message: `한국투자증권 이벤트 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+      events: [],
+    };
+  }
+}
+
+async function collectDaishin(today: string): Promise<CollectHit> {
+  const issuer = "daishin" as const;
+  const listUrl = issuerMeta(issuer).listUrl;
+  try {
+    const html = await fetchText(listUrl, {}, 12000);
+    const seen = new Set<string>();
+    const rows: { id: string; title: string; blurb: string; start: string; end: string; applyUrl: string }[] = [];
+    for (const match of html.matchAll(
+      /href='([^']*eventDetail\.ds[^']*cid=(\d+))'>([^<]+)<\/a>[\s\S]{0,240}?class="sub">([^<]*)<\/p>[\s\S]{0,200}?(\d{4})\.(\d{2})\.(\d{2})\s*~\s*(\d{4})\.(\d{2})\.(\d{2})/g,
+    )) {
+      const id = match[2];
+      if (seen.has(id)) continue;
+      const title = tidy(match[3]);
+      const start = `${match[5]}-${match[6]}-${match[7]}`;
+      const end = `${match[8]}-${match[9]}-${match[10]}`;
+      if (title.length < 4 || !isOngoing(end, today) || start > today) continue;
+      seen.add(id);
+      rows.push({
+        id,
+        title,
+        blurb: tidy(match[4]),
+        start,
+        end,
+        applyUrl: new URL(match[1], "https://www.daishin.com").href,
+      });
+    }
+    const events = (
+      await mapPool(rows, 4, (row) =>
+        keepIfEntry(issuer, row.id, row.title, row.blurb, row.start, row.end, row.applyUrl),
+      )
+    ).filter((event): event is EntryEvent => event !== null);
+    return {
+      issuer,
+      ok: true,
+      message: events.length
+        ? `진행 중인 이벤트 ${events.length}건입니다.`
+        : "이벤트 목록은 열렸지만 오늘 진행 중인 건이 없습니다.",
+      events,
+    };
+  } catch (error) {
+    return {
+      issuer,
+      ok: false,
+      message: `대신증권 이벤트 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+      events: [],
+    };
+  }
+}
+
+async function collectMeritz(today: string): Promise<CollectHit> {
+  const issuer = "meritz" as const;
+  try {
+    const raw = await fetchText("https://home.imeritz.com/cust/ntcevnt/PrgsEvntList.do", {}, 12000);
+    const parsed = JSON.parse(raw) as {
+      selectList?: {
+        evntTitle?: string;
+        evntDesc?: string;
+        evntStartDate?: string;
+        evntEndDate?: string;
+        fileName?: string;
+        evntDescImg?: string;
+        useYn?: string;
+      }[];
+    };
+    const rows = (parsed.selectList ?? [])
+      .map((item) => {
+        const title = tidy(item.evntTitle || "");
+        const start = ymd(item.evntStartDate || "");
+        const end = ymd(item.evntEndDate || "");
+        if (item.useYn !== "Y" || title.length < 4 || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return null;
+        if (!isOngoing(end, today) || start > today) return null;
+        const file = item.fileName || "";
+        const image = item.evntDescImg || "";
+        const applyUrl =
+          file && image
+            ? `https://home.imeritz.com/include/resource/evnt/${file}/${image}`
+            : issuerMeta(issuer).listUrl;
+        return { id: file || title, title, blurb: tidy(item.evntDesc || ""), start, end, applyUrl };
+      })
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+    const events = (
+      await mapPool(rows, 4, (row) =>
+        keepIfEntry(issuer, row.id, row.title, row.blurb, row.start, row.end, row.applyUrl),
+      )
+    ).filter((event): event is EntryEvent => event !== null);
+    return {
+      issuer,
+      ok: true,
+      message: events.length
+        ? `진행 중인 이벤트 ${events.length}건입니다.`
+        : "진행 중 이벤트 목록은 열렸지만 오늘 진행 중인 건이 없습니다.",
+      events,
+    };
+  } catch (error) {
+    return {
+      issuer,
+      ok: false,
+      message: `메리츠증권 이벤트 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+      events: [],
+    };
+  }
+}
+
+async function collectHanaBank(today: string): Promise<CollectHit> {
+  const issuer = "hanabank" as const;
+  const listUrl = issuerMeta(issuer).listUrl;
+  try {
+    const html = await fetchText(listUrl, {}, 12000);
+    const startAt = html.indexOf('class="evt_list"');
+    const section = startAt >= 0 ? html.slice(startAt) : "";
+    const seen = new Set<string>();
+    const rows: { id: string; title: string; blurb: string; start: string; end: string; applyUrl: string }[] = [];
+    for (const match of section.matchAll(
+      /href="(\/cont\/news\/news02\/(\d+)_115431\.jsp)"[\s\S]{0,500}?<p>([\s\S]*?)<\/p>[\s\S]{0,240}?(\d{4})\.(\d{2})\.(\d{2})\s*~\s*(\d{4})\.(\d{2})\.(\d{2})[\s\S]{0,500}?alt="([^"]*)"/g,
+    )) {
+      const id = match[2];
+      if (seen.has(id)) continue;
+      const blurb = tidy(match[3]);
+      const alt = tidy(match[10]);
+      const title = alt.length >= 4 ? alt : blurb;
+      const start = `${match[4]}-${match[5]}-${match[6]}`;
+      const end = `${match[7]}-${match[8]}-${match[9]}`;
+      if (title.length < 4 || !isOngoing(end, today) || start > today) continue;
+      seen.add(id);
+      rows.push({
+        id,
+        title,
+        blurb,
+        start,
+        end,
+        applyUrl: new URL(match[1], "https://www.kebhana.com").href,
+      });
+    }
+    const events = (
+      await mapPool(rows, 4, (row) =>
+        keepIfEntry(issuer, row.id, row.title, row.blurb || row.title, row.start, row.end, row.applyUrl),
+      )
+    ).filter((event): event is EntryEvent => event !== null);
+    return {
+      issuer,
+      ok: true,
+      message: events.length
+        ? `진행 중인 은행 이벤트 ${events.length}건입니다.`
+        : "이벤트 목록은 열렸지만 오늘 진행 중인 건이 없습니다.",
+      events,
+    };
+  } catch (error) {
+    return {
+      issuer,
+      ok: false,
+      message: `하나은행 이벤트 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+      events: [],
+    };
+  }
+}
+
 const SPECIAL: Partial<Record<IssuerId, (today: string) => Promise<CollectHit>>> = {
   mirae: collectMirae,
   samsungsec: collectSamsungSec,
   hanasec: collectHanaSec,
   kbsec: collectKbSec,
+  koreainvest: collectKoreaInvest,
+  daishin: collectDaishin,
+  meritz: collectMeritz,
   wooribank: collectWooriBank,
   kbbank: collectKbBank,
+  hanabank: collectHanaBank,
   ibkbank: collectIbkBank,
 };
 

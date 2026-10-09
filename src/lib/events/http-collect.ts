@@ -553,7 +553,8 @@ async function collectNh(today: string): Promise<CollectHit> {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
-        Referer: "https://card.nonghyup.com/servlet/IPCB010501.menu",
+        Referer: "https://card.nonghyup.com/servlet/IPCC010001.menu",
+        Origin: "https://card.nonghyup.com",
       },
       body: "menu_id=IPCB010501&DTL_CNM=04&DTL_CNM_DT=04&indexNum=1&pageNum=1&pageSize=40&ORDER_CONDITION=DEADLINE&SEARCH_TEXT=",
     });
@@ -604,7 +605,7 @@ async function collectNh(today: string): Promise<CollectHit> {
           startDate: card.start,
           endDate: card.end,
           applyUrl,
-          entry: isEntryCopy(`${text}\n${card.title}`) || /응모/.test(card.title),
+          entry: true,
         });
       })
     ).filter((event): event is EntryEvent => event !== null);
@@ -820,6 +821,100 @@ async function collectIbk(today: string): Promise<CollectHit> {
   }
 }
 
+type WooriItem = {
+  evntSrno?: string;
+  evntItgCfcd?: string;
+  evntSdt?: string;
+  evntEdt?: string;
+  cardEvntNm?: string;
+  evntSumTxt?: string;
+  totCnt?: number;
+};
+
+const WOORI_ENTRY = new Set(["2", "3", "4", "5", "6", "C"]);
+
+function dottedDay(value: string): string {
+  const match = value.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : "";
+}
+
+async function collectWoori(today: string): Promise<CollectHit> {
+  const issuer = "woori" as const;
+  const listUrl = issuerMeta(issuer).listUrl;
+  const api = "https://pc.wooricard.com/dcpc/yh1/bnf/bnf02/prgevnt/getPrgEvntList.pwkjson";
+  try {
+    const rows: WooriItem[] = [];
+    let total = 0;
+    for (let page = 1; page <= 4; page += 1) {
+      const raw = await fetchText(api, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "Proworks-Body": "Y",
+          "Proworks-Lang": "ko",
+          Referer: listUrl,
+          Accept: "application/json, text/javascript, */*; q=0.01",
+        },
+        body: JSON.stringify({
+          bnf02PrgEvntVo: {
+            evntCtgrNo: "",
+            searchKwrd: "",
+            sortOrd: "orderNew",
+            pageIndex: String(page),
+            pageSize: "30",
+            evntItgCfcd: "",
+          },
+        }),
+      });
+      const parsed = JSON.parse(raw) as { prgEvntList?: WooriItem[]; elHeader?: { resSuc?: boolean } };
+      if (!parsed.elHeader?.resSuc) throw new Error("목록 응답이 실패했습니다.");
+      const list = parsed.prgEvntList ?? [];
+      if (!list.length) break;
+      total = Number(list[0]?.totCnt || total);
+      rows.push(...list);
+      if (rows.length >= total) break;
+    }
+    const events = rows
+      .map((item) => {
+        const title = stripTags(item.cardEvntNm || "").replace(/\s+/g, " ").trim();
+        const summary = stripTags(item.evntSumTxt || "").replace(/\s+/g, " ").trim();
+        const start = dottedDay(item.evntSdt || "");
+        const end = dottedDay(item.evntEdt || "");
+        if (!item.evntSrno || title.length < 4 || !end || (start && start > today) || !isOngoing(end, today)) return null;
+        const entry = WOORI_ENTRY.has(item.evntItgCfcd || "") || isEntryCopy(`${title} ${summary}`);
+        return eventBase(issuer, item.evntSrno, {
+          title,
+          summary: summary || title,
+          benefit: (summary || title).slice(0, 80),
+          conditions: [summary || "대상과 제외 조건은 카드사 화면에서 확인하세요."],
+          exclusions: [],
+          startDate: start || today,
+          endDate: end,
+          applyUrl: listUrl,
+          entry,
+        });
+      })
+      .filter((event): event is EntryEvent => event !== null);
+    const unique = [...new Map(events.map((event) => [event.id, event])).values()];
+    const entries = unique.filter((event) => event.entry !== false).length;
+    return {
+      issuer,
+      ok: true,
+      message: unique.length
+        ? `진행 ${unique.length}건 중 응모·참여 ${entries}건입니다.`
+        : "진행 중 이벤트 목록은 열렸지만 오늘 진행 중인 건이 없습니다.",
+      events: unique,
+    };
+  } catch (error) {
+    return {
+      issuer,
+      ok: false,
+      message: `우리카드 이벤트 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+      events: [],
+    };
+  }
+}
+
 export async function collectLive(today = seoulToday()): Promise<CollectHit[]> {
   const [cards, markets] = await Promise.all([
     Promise.all([
@@ -828,6 +923,7 @@ export async function collectLive(today = seoulToday()): Promise<CollectHit[]> {
       collectHyundai(today),
       collectKb(today),
       collectLotte(today),
+      collectWoori(today),
       collectHana(today),
       collectNh(today),
       collectBc(today),
