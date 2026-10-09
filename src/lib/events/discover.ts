@@ -64,10 +64,8 @@ export function findDatedEventLinks(html: string, sourceUrl: string, today: stri
     // The next link is a hard boundary: otherwise its dates can be mistakenly
     // attached to this title, creating a promotion that does not exist.
     const following = visible.slice(a.index, a.index + 720);
-    const nextAnchor = following.search(/<a\\b/i);
-    const nextIndex = nextAnchor === 0
-      ? following.slice(2).search(/<a\\b/i) + 2
-      : nextAnchor;
+    const nextMatch = following.slice(2).search(/<a\b/i);
+    const nextIndex = nextMatch >= 0 ? nextMatch + 2 : -1;
     const boundaries = [following.indexOf("</li>"), following.indexOf("</article>"),
       nextIndex].filter((idx) => idx > 0);
     const after = following.slice(0, boundaries.length ? Math.min(...boundaries) : 720);
