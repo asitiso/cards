@@ -1,5 +1,6 @@
 import { getSql, dbSource } from "@/lib/db";
 import { diffEventLists } from "@/lib/change-history/diff";
+import { suddenDrop } from "./quality";
 import { appendChanges, recentChanges } from "@/lib/change-history/store.server";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
@@ -238,6 +239,15 @@ export async function refreshBoard(): Promise<Board> {
       from entry_events where issuer = ${hit.issuer} and active = true
     `;
     const previousEvents = previousRows.map(toEvent);
+    const previousOngoing = previousEvents.filter((event) => event.endDate >= today).length;
+    if (suddenDrop(previousOngoing, hit.events.length)) {
+      // A site can return a valid-looking but truncated page during outages or
+      // layout changes. Never turn this into false "removed" change-history rows.
+      hit.ok = false;
+      hit.message = `진행 중 ${previousOngoing}건에서 ${hit.events.length}건으로 급감해 수집 검증이 필요합니다.`;
+      hit.events = [];
+      continue;
+    }
     await sql`update entry_events set active = false where issuer = ${hit.issuer}`;
     for (const event of hit.events) {
       await sql`
