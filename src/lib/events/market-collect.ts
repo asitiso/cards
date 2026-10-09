@@ -1,6 +1,7 @@
-import { fetchText, isOngoing, mapPool, stripTags, visibleMarkup, ymd } from "./html.ts";
+import { fetchText, isOngoing, mapPool, splitRules, stripTags, visibleMarkup, ymd } from "./html.ts";
 import { ISSUERS, issuerMeta, type EntryEvent, type IssuerId } from "./types.ts";
 import type { CollectHit } from "./http-collect.ts";
+import { findDatedEventLinks, findEventIndexPages, stableLinkId } from "./discover.ts";
 
 const ENTRY = /응모|쿠폰|추첨|이벤트\s*신청|신청\s*필수|신청하기|참여\s*신청/;
 
@@ -20,7 +21,7 @@ function eventOf(
     issuer,
     title,
     summary: line,
-    benefit: entry ? "응모·쿠폰·추첨" : "자동 적용·안내",
+    benefit: line !== title && line.length >= 12 ? line.slice(0, 80) : (entry ? "원문에서 혜택 확인" : "원문에서 조건 확인"),
     conditions: [line],
     exclusions: [],
     startDate,
@@ -94,7 +95,7 @@ async function keepIfEntry(
   try {
     const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8000));
     const entry = isEntry(text);
-    return eventOf(
+    const result = eventOf(
       issuer,
       externalId,
       title,
@@ -104,6 +105,12 @@ async function keepIfEntry(
       applyUrl,
       entry,
     );
+    // Extract only terms present on the official detail page; no invented
+    // eligibility, exclusions or reward amounts.
+    const rules = splitRules(text);
+    if (rules.conditions.length) result.conditions = rules.conditions;
+    if (rules.exclusions.length) result.exclusions = rules.exclusions;
+    return result;
   } catch {
     return eventOf(issuer, externalId, title, tidy(blurb) || title, start, end, applyUrl, false);
   }
@@ -484,31 +491,11 @@ async function collectWooriBank(today: string): Promise<CollectHit> {
   }
 }
 
-function genericEvents(issuer: IssuerId, html: string, today: string): EntryEvent[] {
-  const listUrl = issuerMeta(issuer).listUrl;
-  const visible = visibleMarkup(html);
-  const events: EntryEvent[] = [];
-  const seen = new Set<string>();
-  for (const match of visible.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)) {
-    const href = match[1];
-    if (/javascript:|^#|로그인|메뉴/.test(href)) continue;
-    const text = stripTags(match[2]).replace(/\s+/g, " ").trim();
-    if (text.length < 8 || text.length > 80) continue;
-    let applyUrl: string;
-    try {
-      applyUrl = new URL(href, listUrl).href;
-    } catch {
-      continue;
-    }
-    if (seen.has(applyUrl)) continue;
-    const around = visible.slice(match.index ?? 0, (match.index ?? 0) + 500);
-    const range = dateRange(stripTags(around));
-    if (!range || !isOngoing(range.end, today)) continue;
-    seen.add(applyUrl);
-    events.push(eventOf(issuer, String(seen.size), text, text, range.start, range.end, applyUrl, ENTRY.test(text)));
-    if (events.length >= 12) break;
-  }
-  return events;
+function genericEvents(issuer: IssuerId, html: string, today: string, sourceUrl: string): EntryEvent[] {
+  return findDatedEventLinks(html, sourceUrl, today).map((row) =>
+    eventOf(issuer, stableLinkId(row.url), row.title, row.title,
+      row.start, row.end, row.url, isEntry(row.title)),
+  );
 }
 
 async function collectGeneric(issuer: IssuerId, today: string): Promise<CollectHit> {
@@ -517,20 +504,32 @@ async function collectGeneric(issuer: IssuerId, today: string): Promise<CollectH
     const html = await fetchText(meta.listUrl, {}, 8000);
     const title = stripTags(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
     if (/요청 오류|이용불가|오류페이지|접근.?거부|not found/i.test(title)) {
-      return {
-        issuer,
-        ok: false,
-        message: `${meta.name} 목록이 막혀 있습니다. 앱이나 웹에서 확인하세요.`,
-        events: [],
-      };
+      return { issuer, ok: false, message: `${meta.name} 행사 목록 접근 오류입니다.`, events: [] };
     }
-    const events = genericEvents(issuer, html, today);
+
+    let events = genericEvents(issuer, html, today, meta.listUrl);
+    if (events.length === 0) {
+      // Most institutional homepages do not carry dated event listings.
+      // Follow no more than two *same-domain* public event index links.
+      const urls = findEventIndexPages(html, meta.listUrl);
+      const pages = await mapPool(urls, 2, async (url) => {
+        try {
+          return { url, html: await fetchText(url, {}, 6500) };
+        } catch {
+          return { url, html: "" };
+        }
+      });
+      for (const page of pages) {
+        if (page.html) events.push(...genericEvents(issuer, page.html, today, page.url));
+      }
+    }
+    events = [...new Map(events.map((event) => [event.id, event])).values()].slice(0, 12);
     return {
       issuer,
-      ok: true,
+      ok: events.length > 0,
       message: events.length
-        ? `${meta.name}에서 응모·쿠폰·추첨 ${events.length}건을 읽었습니다.`
-        : `${meta.name} 화면에는 날짜가 있는 응모·쿠폰·추첨이 없습니다. 앱에서 확인하세요.`,
+        ? `${meta.name} 공식 공개 화면에서 날짜·링크를 확인한 행사 ${events.length}건입니다.`
+        : `${meta.name} 공개 행사 날짜를 검증하지 못했습니다. 실제 행사 없음으로 판단하지 않습니다.`,
       events,
     };
   } catch (error) {
