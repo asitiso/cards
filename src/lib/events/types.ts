@@ -352,6 +352,8 @@ export type EntryEvent = {
   listUrl: string;
   /** false면 응모·신청이 필요 없는 행사. 없으면 응모로 본다. */
   entry?: boolean;
+  /** Collection-only flag; not persisted. A source detail page was not inspected. */
+  detailUnverified?: boolean;
 };
 
 export type IssuerReport = {
