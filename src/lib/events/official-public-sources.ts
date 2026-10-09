@@ -3,7 +3,7 @@ import { stableLinkId } from "./discover.ts";
 import { issuerMeta, type EntryEvent } from "./types.ts";
 import type { CollectHit } from "./http-collect.ts";
 
-export type NewlyCoveredIssuer = "nhbank" | "nhsec" | "kakaopaysec";
+export type NewlyCoveredIssuer = "nhbank" | "nhsec" | "kakaopaysec" | "shinhanbank" | "tossbank";
 type OfficialPromotion = {
   url: string;
   title: string;
@@ -13,6 +13,8 @@ type OfficialPromotion = {
   identity: RegExp;
   /** Dates must appear in the same *current official publication*. */
   dateEvidence: RegExp;
+  /** The actual reward must be present, not just a campaign-like heading. */
+  benefitEvidence?: RegExp;
   entry: boolean;
 };
 
@@ -73,7 +75,66 @@ export const PUBLIC_PROMOTIONS: Record<NewlyCoveredIssuer, readonly OfficialProm
       entry:false,
     },
   ],
+  shinhanbank: [
+    {
+      // Public report of Shinhan Bank's own Dangyeoyo campaign announcement.
+      url:"https://www.newspim.com/news/view/20260930001079",
+      title:"신한은행 땡겨요 땡배달 배달비 전액 지원",
+      benefit:"땡겨요 땡배달 제휴 배달 이용 시 고객 배달비 전액 지원 (별도 쿠폰·응모 불필요)",
+      start:"2026-10-01",end:"2026-12-31",
+      identity:/신한은행.{0,75}땡겨요/,
+      dateEvidence:/10월\s*1일부터\s*연말까지/,
+      benefitEvidence:/배달비를?\s*전액\s*지원|배달비\s*전액\s*지원/,
+      entry:false,
+    },
+  ],
+  tossbank: [
+    {
+      // Company-launch event confirmed by press accounts. The event start
+      // is 2026-07-30, and a start during the campaign permits 100 later saves.
+      url:"https://www.edaily.co.kr/News/Read?mediaCodeNo=257&newsId=03407926645520096",
+      title:"토스뱅크 외화 저금통 행운의 2달러",
+      benefit:"행사 기간 외화 저금통 적립 시작 후 매일 1만원 이상 자동이체 100회 달성 시 2달러",
+      start:"2026-07-30",end:"2026-10-30",
+      identity:/토스뱅크.{0,250}외화\s*저금통/,
+      dateEvidence:/7월\s*30일부터\s*10월\s*30일까지/,
+      benefitEvidence:/100회.{0,65}2달러|2달러.{0,65}100회/,
+      entry:false,
+    },
+    {
+      url:"https://www.newspim.com/news/view/20260731000204",
+      title:"토스뱅크 외화 저금통 행운의 2달러",
+      benefit:"행사 기간 외화 저금통 적립 시작 후 매일 1만원 이상 자동이체 100회 달성 시 2달러",
+      start:"2026-07-30",end:"2026-10-30",
+      identity:/토스뱅크.{0,250}외화\s*저금통/,
+      dateEvidence:/이벤트는?\s*10월\s*30일까지\s*운영|이벤트를?\s*10월\s*30일까지\s*진행/,
+      benefitEvidence:/100회.{0,75}2달러|2달러.{0,75}100회/,
+      entry:false,
+    },
+  ],
   nhsec: [
+    {
+      // NH Investment & Securities' DC campaign announcement, reported by
+      // the National Agricultural Cooperative's own news publication.
+      url:"https://www.nongmin.com/article/20261002500504",
+      title:"NH투자증권 퇴직연금 DC 신규가입 경품 이벤트",
+      benefit:"퇴직연금 DC 신규가입·최초 입금: 순입금 1천만원 이상 네이버페이 3만원, 미만 아메리카노 2매",
+      start:"2026-10-01",end:"2027-01-31",
+      identity:/NH투자증권.{0,145}퇴직연금.{0,35}DC/,
+      dateEvidence:/10월\s*1일부터\s*2027년\s*1월\s*31일까지/,
+      benefitEvidence:/네이버페이.{0,35}3만원/,
+      entry:false,
+    },
+    {
+      url:"https://www1.edaily.co.kr/News/Read?mediaCodeNo=257&newsId=03391526645608984",
+      title:"NH투자증권 퇴직연금 DC 신규가입 경품 이벤트",
+      benefit:"퇴직연금 DC 신규가입·최초 입금: 순입금 1천만원 이상 네이버페이 3만원, 미만 아메리카노 2매",
+      start:"2026-10-01",end:"2027-01-31",
+      identity:/NH투자증권.{0,145}퇴직연금.{0,35}DC/,
+      dateEvidence:/2026년\s*10월\s*1일부터\s*2027년\s*1월\s*31일까지/,
+      benefitEvidence:/네이버페이.{0,40}3만원/,
+      entry:false,
+    },
     {
       url:"https://www.mynamuh.com/tx/main.html",
       title:"나무증권 중개형 ISA 신규 개설 수수료 우대",
@@ -102,7 +163,8 @@ export function verifyNewOfficialPromotion(
 ): EntryEvent | null {
   if (today < source.start || today > source.end) return null;
   const text = stripTags(visibleMarkup(html)).replace(/\s+/g, " ");
-  if (!source.identity.test(text) || !source.dateEvidence.test(text)) return null;
+  if (!source.identity.test(text) || !source.dateEvidence.test(text) ||
+    (source.benefitEvidence && !source.benefitEvidence.test(text))) return null;
   const rules = splitRules(stripTags(visibleMarkup(html)));
   return {
     id: issuer+":"+stableLinkId(source.url),
