@@ -1,4 +1,6 @@
 import type { CollectHit } from "./http-collect.ts";
+import type { EntryEvent } from "./types.ts";
+import { isBoilerplateRule } from "./html.ts";
 
 /**
  * Only verified, consistent batches may replace previously saved events.
@@ -68,5 +70,35 @@ export function suspiciousMissingOngoing(
     missing,
     total:ongoing.length,
     suspicious:ongoing.length>=8 && missing>=Math.max(3,Math.ceil(ongoing.length*0.15)),
+  };
+}
+
+
+/** Keep known terms when only a title/list preview was read this time.
+ * Never retain previous details when campaign title or dates have changed.
+ * Actual re-verified detail pages always take precedence. */
+export function mergeUnverifiedDetails(previous: EntryEvent | undefined, incoming: EntryEvent): EntryEvent {
+  if (!previous || !incoming.detailUnverified) return incoming;
+  if (previous.title !== incoming.title ||
+      previous.startDate !== incoming.startDate ||
+      previous.endDate !== incoming.endDate) return incoming;
+  const useful = (value:string) =>
+    value.trim().length>=12 &&
+    !/^(?:원문에서|회사 화면에서|대상과 제외 조건은|카드사 페이지의)/.test(value) &&
+    !isBoilerplateRule(value);
+  const oldTerms=previous.conditions.filter(useful);
+  const newTerms=incoming.conditions.filter(useful);
+  const oldExclusions=previous.exclusions.filter(useful);
+  const newExclusions=incoming.exclusions.filter(useful);
+  const genericBenefit=(text:string)=>!useful(text) || text===incoming.title;
+  return {
+    ...incoming,
+    summary: useful(incoming.summary) && incoming.summary!==incoming.title
+      ? incoming.summary : (useful(previous.summary) ? previous.summary : incoming.summary),
+    benefit: genericBenefit(incoming.benefit) && useful(previous.benefit)
+      ? previous.benefit : incoming.benefit,
+    conditions: newTerms.length ? newTerms : oldTerms,
+    exclusions: newExclusions.length ? newExclusions : oldExclusions,
+    entry: previous.entry,
   };
 }
