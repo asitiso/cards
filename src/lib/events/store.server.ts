@@ -1,7 +1,7 @@
 import { getSql, dbSource } from "@/lib/db";
 import { diffEventLists } from "@/lib/change-history/diff";
 import { suddenDrop } from "./quality";
-import { appendChanges, recentChanges } from "@/lib/change-history/store.server";
+import { appendChanges } from "@/lib/change-history/store.server";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
 import { SNAPSHOT_AT, SNAPSHOT_EVENTS, SNAPSHOT_REPORT } from "./snapshot.ts";
@@ -161,17 +161,28 @@ async function backfillExtra(): Promise<void> {
 
 async function readBoard(): Promise<Board> {
   const sql = await getSql();
-  const rows = await sql<EventRow>`
-    select id, issuer, title, summary, benefit, conditions, exclusions,
-           start_date::text as start_date, end_date::text as end_date,
-           apply_url, list_url, entry
-    from entry_events
-    where active = true
-    order by end_date asc, title asc
-  `;
-  const state = await sql<{ collected_at: string; report: string }>`
-    select collected_at::text as collected_at, report from collect_state where id = 1
-  `;
+  // Independent read-only queries run in parallel. No seed/backfill on an
+  // established database: those previously added serial round trips to every
+  // cold homepage request, and could mutate the read-only landing page.
+  const [rows, state] = await Promise.all([
+    sql<EventRow>`
+      select id, issuer, title, summary, benefit, conditions, exclusions,
+             start_date::text as start_date, end_date::text as end_date,
+             apply_url, list_url, entry
+      from entry_events
+      where active = true
+      order by end_date asc, title asc
+    `,
+    sql<{ collected_at: string; report: string }>`
+      select collected_at::text as collected_at, report from collect_state where id = 1
+    `,
+  ]);
+  if (state.length === 0) {
+    // Preserve the previous first-boot behavior for a brand-new database.
+    await seedIfEmpty();
+    await backfillExtra();
+    return readBoard();
+  }
   const events = rows.map(toEvent);
   const counts = new Map<string, number>();
   for (const event of events) counts.set(event.issuer, (counts.get(event.issuer) ?? 0) + 1);
@@ -186,7 +197,7 @@ async function readBoard(): Promise<Board> {
     today: seoulToday(),
     events,
     issuers: fullReport(partial, counts),
-    changes: await recentChanges("finance"),
+    changes: [], // History is fetched only when the collapsed panel opens.
   };
 }
 
@@ -218,8 +229,6 @@ function bundledBoard(): Board {
 
 export async function loadBoard(): Promise<Board> {
   if (dbSource === "pglite") return bundledBoard();
-  await seedIfEmpty();
-  await backfillExtra();
   return readBoard();
 }
 
