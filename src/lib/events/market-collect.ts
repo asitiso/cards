@@ -366,6 +366,55 @@ async function collectIbkBank(today: string): Promise<CollectHit> {
   }
 }
 
+function kbDetail(id: string): string {
+  const params = new URLSearchParams({
+    page: "C016559",
+    cc: "b033091:b032977",
+    QSL: "F",
+  });
+  params.set("이벤트일련번호", id);
+  return `https://omoney.kbstar.com/quics?${params.toString()}`;
+}
+
+async function collectKbBank(today: string): Promise<CollectHit> {
+  const issuer = "kbbank" as const;
+  const listUrl = issuerMeta(issuer).listUrl;
+  try {
+    const html = await fetchText(listUrl, {}, 12000);
+    const found = new Map<string, { title: string; start: string; end: string }>();
+    for (const match of html.matchAll(
+      /goThumbDetail\('(\d+)'\)[\s\S]{0,700}?alt="([^"]*)"[\s\S]{0,240}?(\d{4})\.(\d{2})\.(\d{2})\s*~\s*(\d{4})\.(\d{2})\.(\d{2})/g,
+    )) {
+      const title = stripTags(match[2]).replace(/\s+/g, " ").trim();
+      const start = `${match[3]}-${match[4]}-${match[5]}`;
+      const end = `${match[6]}-${match[7]}-${match[8]}`;
+      if (title.length < 4 || !isOngoing(end, today) || start > today) continue;
+      if (!found.has(match[1])) found.set(match[1], { title, start, end });
+    }
+    const rows = [...found.entries()];
+    const events = (
+      await mapPool(rows, 4, ([id, row]) =>
+        keepIfEntry(issuer, id, row.title, row.title, row.start, row.end, kbDetail(id)),
+      )
+    ).filter((event): event is EntryEvent => event !== null);
+    return {
+      issuer,
+      ok: true,
+      message: events.length
+        ? `진행 중인 은행 이벤트 ${events.length}건입니다.`
+        : "공개 이벤트 목록은 열렸지만 진행 중인 행사는 없습니다.",
+      events,
+    };
+  } catch (error) {
+    return {
+      issuer,
+      ok: false,
+      message: `KB국민은행 이벤트 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+      events: [],
+    };
+  }
+}
+
 async function collectWooriBank(today: string): Promise<CollectHit> {
   const issuer = "wooribank" as const;
   const listUrl = issuerMeta(issuer).listUrl;
@@ -500,6 +549,7 @@ const SPECIAL: Partial<Record<IssuerId, (today: string) => Promise<CollectHit>>>
   hanasec: collectHanaSec,
   kbsec: collectKbSec,
   wooribank: collectWooriBank,
+  kbbank: collectKbBank,
   ibkbank: collectIbkBank,
 };
 

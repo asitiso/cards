@@ -259,7 +259,7 @@ export const ISSUERS: IssuerMeta[] = [
     id: "kbbank",
     name: "KB국민은행",
     short: "KB",
-    listUrl: "https://obank.kbstar.com/",
+    listUrl: "https://omoney.kbstar.com/quics?page=oevent",
     market: "bank",
     androidPackage: "com.kbstar.kbbank",
     iosAppId: "373742138",
