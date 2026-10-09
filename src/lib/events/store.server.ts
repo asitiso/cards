@@ -1,6 +1,6 @@
 import { getSql, dbSource } from "@/lib/db";
 import { diffEventLists } from "@/lib/change-history/diff";
-import { suddenDrop } from "./quality";
+import { suddenDrop, suspiciousMissingOngoing } from "./quality";
 import { appendChanges } from "@/lib/change-history/store.server";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
@@ -254,6 +254,15 @@ export async function refreshBoard(): Promise<Board> {
       // layout changes. Never turn this into false "removed" change-history rows.
       hit.ok = false;
       hit.message = `진행 중 ${previousOngoing}건에서 ${hit.events.length}건으로 급감해 수집 검증이 필요합니다.`;
+      hit.events = [];
+      continue;
+    }
+    const missing = suspiciousMissingOngoing(previousEvents, hit.events, today);
+    if (missing.suspicious) {
+      // Even a valid-looking partial page can omit 3+ ongoing promotions.
+      // Block false removed-history records until a complete response arrives.
+      hit.ok = false;
+      hit.message = `기존 진행 행사 ${missing.total}건 중 ${missing.missing}건이 새 목록에서 누락되어 수집 확인이 필요합니다.`;
       hit.events = [];
       continue;
     }
