@@ -99,10 +99,13 @@ async function keepIfEntry(
   if (isEntry(preview)) {
     // The list already proves participation, but NOT the detailed eligibility
     // and exclusions. Never overwrite previously verified terms from this.
-    return {
-      ...eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl, true),
-      detailUnverified: true,
-    };
+    const listOnly=eventOf(issuer, externalId, title, clue(preview, title, blurb), start, end, applyUrl, true);
+    if (issuer === "daishin") {
+      // The list blurb often describes a reward, not eligibility.
+      listOnly.conditions = [];
+      listOnly.exclusions = [];
+    }
+    return { ...listOnly, detailUnverified: true };
   }
   try {
     const text = pageText(await fetchText(applyUrl, { headers: { Referer: issuerMeta(issuer).listUrl } }, 8000));
