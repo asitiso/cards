@@ -474,7 +474,7 @@ function matchesScope(event: EntryEvent, scope: "entry" | "all" | "other"): bool
   return true;
 }
 
-function issuerName(id: IssuerId): string {
+function issuerName(id: string): string {
   return ISSUERS.find((item) => item.id === id)?.name ?? id;
 }
 

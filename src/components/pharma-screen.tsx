@@ -1,7 +1,7 @@
 import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { removePharmaLogin, reloadPharma, storePharmaLogin, createPharmaCompany, editPharmaCompany, removePharmaCompany } from "@/lib/pharma/board.functions";
-import { PHARMA_KIND_LABEL, type PharmaBoard, type PharmaBrowserLogin, type PharmaEvent } from "@/lib/pharma/types";
+import { reloadPharma } from "@/lib/pharma/board.functions";
+import { PHARMA_KIND_LABEL, type PharmaBoard, type PharmaEvent } from "@/lib/pharma/types";
 import { ChangeHistory } from "@/components/change-history";
 
 export function PharmaScreen({
@@ -13,19 +13,12 @@ export function PharmaScreen({
 }) {
   const [board, setBoard] = useState(initial);
   const [company, setCompany] = useState<string>("all");
-  const [adding, setAdding] = useState(false);
-  const [draftName, setDraftName] = useState("");
-  const [draftUrl, setDraftUrl] = useState("");
   const [sort, setSort] = useState<"soon" | "new">("soon");
   const [query, setQuery] = useState("");
   const [openIds, setOpenIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
 
-  const selected = board.companies.find((item) => item.id === company);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -46,69 +39,8 @@ export function PharmaScreen({
   }, [board, company, query, sort]);
 
   function pick(id: string) {
-    setAdding(false);
     setCompany(id);
-    const row = board.companies.find((item) => item.id === id);
-    setUsername(row?.username ?? "");
-    setDraftName(row?.name ?? "");
-    setDraftUrl(row?.loginUrl ?? "");
-    setPassword("");
     setError("");
-  }
-
-  function startAdd() {
-    setCompany("all");
-    setAdding(true);
-    setUsername("");
-    setPassword("");
-    setDraftName("");
-    setDraftUrl("https://");
-    setError("");
-  }
-
-  async function saveCompany() {
-    setSaving(true);
-    setError("");
-    try {
-      if (adding) {
-        const created = await createPharmaCompany({ data: { name: draftName, loginUrl: draftUrl } });
-        setBoard(created.board);
-        setAdding(false);
-        setCompany(created.id);
-        const row = created.board.companies.find((item) => item.id === created.id);
-        setDraftName(row?.name ?? draftName);
-        setDraftUrl(row?.loginUrl ?? draftUrl);
-        setUsername("");
-      } else if (company !== "all") {
-        const next = await editPharmaCompany({ data: { companyId: company, name: draftName, loginUrl: draftUrl } });
-        setBoard(next);
-        const row = next.companies.find((item) => item.id === company);
-        setDraftName(row?.name ?? draftName);
-        setDraftUrl(row?.loginUrl ?? draftUrl);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "저장하지 못했습니다.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteCompany() {
-    if (company === "all") return;
-    setSaving(true);
-    setError("");
-    try {
-      setBoard(await removePharmaCompany({ data: { companyId: company } }));
-      setCompany("all");
-      setDraftName("");
-      setDraftUrl("");
-      setUsername("");
-      setPassword("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "지우지 못했습니다.");
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function refresh() {
@@ -120,41 +52,6 @@ export function PharmaScreen({
       setError(err instanceof Error ? err.message : "다시 수집하지 못했습니다.");
     } finally {
       setPending(false);
-    }
-  }
-
-  async function saveLogin() {
-    if (company === "all" || !selected) return;
-    const loginUrl = selected.loginUrl;
-    const tab = window.open("about:blank", "_blank");
-    setSaving(true);
-    setError("");
-    try {
-      const next = await storePharmaLogin({ data: { companyId: company, username, password } });
-      setBoard(next.board);
-      openMall(tab, next.login, username, password, loginUrl);
-      setPassword("");
-      setUsername(next.board.companies.find((item) => item.id === company)?.username ?? username);
-    } catch (err) {
-      openMall(tab, null, username, password, loginUrl);
-      setError(err instanceof Error ? err.message : "저장하지 못했습니다.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function clearLogin() {
-    if (company === "all") return;
-    setSaving(true);
-    setError("");
-    try {
-      setBoard(await removePharmaLogin({ data: { companyId: company } }));
-      setUsername("");
-      setPassword("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "지우지 못했습니다.");
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -178,7 +75,7 @@ export function PharmaScreen({
             className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-ink px-3 text-xs font-medium text-paper disabled:opacity-60"
           >
             <RefreshCw className={pending ? "size-3.5 animate-spin" : "size-3.5"} />
-            {pending ? "수집 중" : "다시 수집"}
+            {pending ? "불러오는 중" : "목록 새로고침"}
           </button>
         </div>
       </header>
@@ -211,7 +108,7 @@ export function PharmaScreen({
       </div>
 
       <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 pb-0.5 sm:mx-0 sm:px-0">
-        <Chip active={company === "all" && !adding} onClick={() => pick("all")}>
+        <Chip active={company === "all"} onClick={() => pick("all")}>
           전체 {board.events.length}
         </Chip>
         {board.companies.map((item) => (
@@ -219,108 +116,15 @@ export function PharmaScreen({
             {item.short} {item.count}
           </Chip>
         ))}
-        <Chip active={adding} onClick={startAdd}>
-          추가
-        </Chip>
       </div>
 
-      {adding || company !== "all" ? (
-        <form
-          className="mt-2 flex flex-wrap items-center gap-1.5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void saveCompany();
-          }}
-        >
-          <input
-            value={draftName}
-            onChange={(event) => setDraftName(event.target.value)}
-            placeholder="회사 이름"
-            className="h-8 min-w-0 flex-1 rounded-full border border-line bg-card px-3 text-base outline-none sm:text-sm"
-          />
-          <input
-            value={draftUrl}
-            onChange={(event) => setDraftUrl(event.target.value)}
-            placeholder="홈페이지 주소"
-            className="h-8 min-w-0 flex-[2] rounded-full border border-line bg-card px-3 text-base outline-none sm:text-sm"
-          />
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex h-8 shrink-0 items-center rounded-full bg-ink px-3 text-xs font-medium text-paper disabled:opacity-60"
-          >
-            {adding ? "추가" : "수정"}
-          </button>
-          {company !== "all" ? (
-            <button
-              type="button"
-              onClick={() => void deleteCompany()}
-              disabled={saving}
-              className="inline-flex h-8 shrink-0 items-center rounded-full border border-line px-3 text-xs text-muted"
-            >
-              회사 삭제
-            </button>
-          ) : null}
-        </form>
-      ) : (
-        <p className="mt-2 text-xs text-muted">회사를 고르면 이름·주소·로그인을 바꿀 수 있습니다.</p>
-      )}
-
-      {company !== "all" ? (
-        <>
-        <form
-          className="mt-2 flex flex-wrap items-center gap-1.5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void saveLogin();
-          }}
-        >
-          <input
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="아이디"
-            autoComplete="off"
-            className="h-8 min-w-0 flex-1 rounded-full border border-line bg-card px-3 text-base outline-none sm:text-sm"
-          />
-          <input
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            type="password"
-            placeholder={selected?.saved ? "비밀번호 변경" : "비밀번호"}
-            autoComplete="off"
-            className="h-8 min-w-0 flex-1 rounded-full border border-line bg-card px-3 text-base outline-none sm:text-sm"
-          />
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex h-8 shrink-0 items-center rounded-full bg-ink px-3 text-xs font-medium text-paper disabled:opacity-60"
-          >
-            {saving ? "확인 중" : "로그인"}
-          </button>
-          {selected?.saved ? (
-            <button
-              type="button"
-              onClick={() => void clearLogin()}
-              disabled={saving}
-              className="inline-flex h-8 shrink-0 items-center rounded-full border border-line px-3 text-xs text-muted"
-            >
-              로그인 삭제
-            </button>
-          ) : null}
-        </form>
-        <p className="mt-1 text-xs text-muted">
-          {selected?.message || "로그인하면 그 몰이 새 창으로 열리고, 아이디는 다음 수집에도 쓰입니다."}
-        </p>
-        </>
-      ) : (
-        <p className="mt-2 text-xs text-muted">회사를 고르고 아이디를 넣은 뒤 로그인하세요.</p>
-      )}
+      <p className="mt-2 text-xs text-muted">제약사 로그인·자동 수집은 일시 중지되었습니다. 기존 행사·변경목록을 확인하거나 아래 바로가기로 제약사 사이트에서 직접 로그인하세요.</p>
 
       <p className="mt-2 text-xs text-muted">{visible.length}건</p>
 
       {visible.length === 0 ? (
         <p className="mt-2 rounded-2xl border border-dashed border-line bg-card px-4 py-6 text-center text-sm text-muted">
-          응모·할인·신제품이 없습니다. 로그인 정보를 저장한 뒤 다시 수집하세요.
+          저장된 응모·할인·신제품이 없습니다. 제약사 사이트에서 확인해 주세요.
         </p>
       ) : (
         <ul className="mt-1.5 overflow-hidden rounded-2xl border border-line bg-card">
@@ -467,41 +271,6 @@ function PharmaBody({ event, companyFull }: { event: PharmaEvent; companyFull: s
       </a>
     </div>
   );
-}
-
-function openMall(
-  tab: Window | null,
-  login: PharmaBrowserLogin | null,
-  username: string,
-  password: string,
-  fallback: string,
-) {
-  const destination = /^https?:/i.test(fallback) ? fallback : "about:blank";
-  if (login && tab) {
-    const doc = tab.document;
-    const form = doc.createElement("form");
-    form.method = login.method;
-    form.action = login.action;
-    form.acceptCharset = login.charset;
-    const fields = new Map(login.fields.map((field) => [field.name, field.value]));
-    fields.set(login.userField, username);
-    fields.set(login.passField, password);
-    for (const [name, value] of fields) {
-      const input = doc.createElement("input");
-      input.type = "hidden";
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
-    }
-    doc.body.appendChild(form);
-    form.submit();
-    return;
-  }
-  if (tab) {
-    tab.location.replace(destination);
-    return;
-  }
-  window.location.assign(destination);
 }
 
 function SortButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
