@@ -26,4 +26,5 @@ jobs:
       - run: npm run typecheck
       - run: node --experimental-strip-types scripts/check-public-bank-sources.mjs
       - run: node --experimental-strip-types scripts/check-public-broker-sources.mjs
+      # Diagnose unavailable official pages without inventing promotions.
       - run: node --experimental-strip-types scripts/check-next-official-sources.mjs
