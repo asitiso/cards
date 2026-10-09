@@ -22,3 +22,20 @@ for (const [issuer,url,title] of samples) {
   }));
  }catch(e){console.log(JSON.stringify({issuer,host:new URL(url).hostname,error:String(e instanceof Error?e.message:e).slice(0,120)}));}
 }
+
+try {
+ const html=await fetchText("https://pc.wooricard.com/dcpc/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno=30006298",{},6000);
+ const urls=[...html.matchAll(/<script[^>]*\\bsrc\\s*=\\s*["']([^"']+)["']/gi)]
+  .map(m=>{try{return new URL(m[1],"https://pc.wooricard.com").href}catch{return ""}})
+  .filter(Boolean);
+ const candidates=urls.filter(v=>/(?:prgevnt|bnf02|event)/i.test(v)).slice(0,3);
+ const inline=[...new Set([...html.matchAll(/[\\w/-]+(?:Evnt|event)[\\w/-]*\\.(?:pwkjson|do)/gi)].map(x=>x[0]))].slice(0,15);
+ console.log("WOORI_DISCOVERY "+JSON.stringify({scriptCount:urls.length,candidatePaths:candidates.map(v=>new URL(v).pathname),inlineRoutes:inline}));
+ for(const url of candidates){
+  try{
+   const js=await fetchText(url,{},5000);
+   const routes=[...new Set([...js.matchAll(/[\\w/-]+(?:Evnt|event)[\\w/-]*\\.(?:pwkjson|do)/gi)].map(x=>x[0]))].slice(0,20);
+   console.log("WOORI_JS_ROUTES "+JSON.stringify({path:new URL(url).pathname,sourceLength:js.length,routes}));
+  }catch(e){console.log("WOORI_JS_UNAVAILABLE "+new URL(url).pathname+" "+String(e).slice(0,80))}
+ }
+}catch(e){console.log("WOORI_DISCOVERY_UNAVAILABLE "+String(e).slice(0,100))}
