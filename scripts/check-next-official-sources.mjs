@@ -1,7 +1,7 @@
 import { collectNewOfficialSource, PUBLIC_PROMOTIONS } from "../src/lib/events/official-public-sources.ts";
 import { fetchText, stripTags, visibleMarkup } from "../src/lib/events/html.ts";
 const today = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Seoul", year:"numeric", month:"2-digit", day:"2-digit"}).format(new Date());
-const ids = ["nhbank", "nhsec", "kakaopaysec"];
+const ids = ["nhbank", "nhsec", "kakaopaysec", "shinhanbank", "tossbank"];
 const results = await Promise.all(ids.map(id=>collectNewOfficialSource(id,today)));
 let verified=0;
 for(const result of results){
@@ -25,4 +25,7 @@ for(const issuer of ids.filter(id=>!results.find(r=>r.issuer===id)?.ok)){
   }
 }
 if(!verified) {console.error("No verified live promotional source: block release.");process.exitCode=1;}
+const required=["shinhanbank","tossbank","nhsec"];
+const failed=required.filter(id=>!results.find(r=>r.issuer===id)?.ok);
+if(failed.length){console.error("Release blocked: live verified promotion not found for "+failed.join(", "));process.exitCode=1;}
 if(verified<ids.length) console.warn("Incomplete coverage: do not claim zero-hit sources fixed.");
