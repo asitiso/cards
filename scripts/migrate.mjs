@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
 import { pendingMigrations } from "./migration-plan.mjs";
+import { postgresOptions } from "./postgres-options.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -42,12 +43,16 @@ async function main() {
     return;
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+  const pool = new pg.Pool({ ...postgresOptions(databaseUrl, process.env.DATABASE_SSL_CA), max: 1 });
   const client = await pool.connect();
   try {
-    await client.query(
-      "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
-    );
+    // An already provisioned database can use a runtime role without CREATE.
+    const tracking = await client.query("SELECT to_regclass('public._migrations') AS name");
+    if (!tracking.rows[0]?.name) {
+      await client.query(
+        "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())",
+      );
+    }
     const applied = (await client.query("SELECT name FROM _migrations")).rows.map(
       (r) => r.name,
     );

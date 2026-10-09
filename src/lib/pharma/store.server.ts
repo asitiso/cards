@@ -53,6 +53,7 @@ async function listCompanies(): Promise<PharmaCompany[]> {
     order by position asc, name asc
   `;
   // Reading the board never seeds or changes an existing database.
+  if (rows.length === 0) return SEED_COMPANIES;
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
