@@ -60,9 +60,25 @@ export function findDatedEventLinks(html: string, sourceUrl: string, today: stri
     if (!url || title.length < 8 || title.length > 120 ||
       /^(이벤트|더보기|바로가기|전체보기|자세히|혜택|로그인)$/i.test(title)) continue;
     if (!/(이벤트|event|evnt|promo|혜택|응모|추첨|캐시백|쿠폰|적금|계좌)/i.test(title+" "+url)) continue;
-    // Use a short local context, not the entire page (which risks borrowing
-    // dates from a completely unrelated promotion).
-    const local = visible.slice(Math.max(0, a.index - 160), a.index + 720);
+    // Only consider the current link and its immediate surrounding list item.
+    // The next link is a hard boundary: otherwise its dates can be mistakenly
+    // attached to this title, creating a promotion that does not exist.
+    const following = visible.slice(a.index, a.index + 720);
+    const nextAnchor = following.search(/<a\\b/i);
+    const nextIndex = nextAnchor === 0
+      ? following.slice(2).search(/<a\\b/i) + 2
+      : nextAnchor;
+    const boundaries = [following.indexOf("</li>"), following.indexOf("</article>"),
+      nextIndex].filter((idx) => idx > 0);
+    const after = following.slice(0, boundaries.length ? Math.min(...boundaries) : 720);
+    const listOpen = visible.lastIndexOf("<li", a.index);
+    const listClose = visible.lastIndexOf("</li>", a.index);
+    const articleOpen = visible.lastIndexOf("<article", a.index);
+    const articleClose = visible.lastIndexOf("</article>", a.index);
+    const precedingStart = listOpen > listClose && a.index - listOpen <= 420
+      ? listOpen
+      : (articleOpen > articleClose && a.index - articleOpen <= 420 ? articleOpen : a.index);
+    const local = visible.slice(precedingStart, a.index) + after;
     const range = rangeFrom(stripTags(local));
     if (!range || range.start > today || range.end < today || range.start > range.end) continue;
     found.set(url, { url, title, ...range });
