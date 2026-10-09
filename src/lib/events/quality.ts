@@ -86,7 +86,10 @@ export function mergeUnverifiedDetails(previous: EntryEvent | undefined, incomin
     value.trim().length>=12 &&
     !/^(?:원문에서|회사 화면에서|대상과 제외 조건은|카드사 페이지의)/.test(value) &&
     !isBoilerplateRule(value);
-  const oldTerms=previous.conditions.filter(useful);
+  const oldTerms=previous.conditions.filter((line) =>
+    useful(line) && !(incoming.issuer === "woori" &&
+      (line === previous.summary || line === previous.benefit || line === previous.title)),
+  );
   const newTerms=incoming.conditions.filter(useful);
   const oldExclusions=previous.exclusions.filter(useful);
   const newExclusions=incoming.exclusions.filter(useful);
