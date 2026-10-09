@@ -43,9 +43,17 @@ export function stripTags(value: string): string {
 }
 
 export function parseRange(value: string): { start: string; end: string } | null {
-  const nums = [...value.matchAll(/(\d{4})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/g)].map(
-    (match) => `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`,
-  );
+  // Card, bank and broker lists use dots, slashes, dashes and Korean date text.
+  // Keep strict four-digit years and reject invalid calendar dates.
+  const nums = [...value.matchAll(/(20\d{2})\s*(?:년|[.\/-])\s*(\d{1,2})\s*(?:월|[.\/-])\s*(\d{1,2})/g)]
+    .map((match) => {
+      const month = Number(match[2]), day = Number(match[3]);
+      const year = Number(match[1]);
+      const date = new Date(Date.UTC(year, month - 1, day));
+      if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month ||
+          date.getUTCDate() !== day) return "";
+      return `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+    }).filter(Boolean);
   if (nums.length < 2) return null;
   return { start: nums[0], end: nums[1] };
 }
@@ -62,7 +70,7 @@ export function isOngoing(endDate: string, today: string): boolean {
 
 const NEGATIVE =
   /응모\s*없이|무응모|별도\s*응모\s*(없|불필요)|별도\s*신청\s*(없|불필요)|응모가\s*불필요|응모\s*불필요|신청\s*없이\s*적용/;
-const POSITIVE = /응모하기|응모\s*필수|응모하고|응모\s*후|이벤트\s*응모|응모하시면/;
+const POSITIVE = /응모하기|응모\s*필수|응모하고|응모\s*후|이벤트\s*응모|응모하시면|이벤트\s*신청|참여\s*신청|쿠폰\s*(?:다운로드|받기)|마이태그/;
 
 export function isEntryCopy(text: string): boolean {
   const flat = text.replace(/\s+/g, " ");
