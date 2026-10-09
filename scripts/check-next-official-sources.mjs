@@ -1,7 +1,7 @@
 import { collectNewOfficialSource, PUBLIC_PROMOTIONS } from "../src/lib/events/official-public-sources.ts";
 import { fetchText, stripTags, visibleMarkup } from "../src/lib/events/html.ts";
 const today = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Seoul", year:"numeric", month:"2-digit", day:"2-digit"}).format(new Date());
-const ids = ["nhbank", "nhsec", "kakaopaysec"];
+const ids = ["nhbank", "nhsec", "kakaopaysec", "shinhanbank", "tossbank"];
 const results = await Promise.all(ids.map(id=>collectNewOfficialSource(id,today)));
 let verified=0;
 for(const result of results){
