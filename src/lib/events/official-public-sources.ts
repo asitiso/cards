@@ -25,6 +25,26 @@ type OfficialPromotion = {
  */
 export const PUBLIC_PROMOTIONS: Record<NewlyCoveredIssuer, readonly OfficialPromotion[]> = {
   nhbank: [
+    // Backup public coverage when NH Financial Group pages time out.
+    // These reports explicitly quote NH Bank's own promotion announcement.
+    {
+      url:"https://www.nongmin.com/article/20260916500215",
+      title:"NH농협은행 가을엔 해외송금 받GO, 행운 받GO!",
+      benefit:"해외송금 후 응모한 고객 500명 추첨 CU 모바일 상품권 5천원",
+      start:"2026-09-16",end:"2026-10-31",
+      identity:/가을엔\s*해외송금\s*받GO.{0,15}행운\s*받GO/i,
+      dateEvidence:/(?:9월\s*)?16일부터\s*10월\s*31일까지/,
+      entry:true,
+    },
+    {
+      url:"https://www.nongmin.com/article/20261002500448",
+      title:"NH농협은행 NH올원뱅크 10주년 페스타 사전 알림 신청",
+      benefit:"10월 12일까지 사전 알림 신청 후 모바일 쿠폰 경품 11,111명 추첨",
+      start:"2026-10-02",end:"2026-10-12",
+      identity:/NH올원뱅크\s*10주년\s*페스타/,
+      dateEvidence:/12일까지\s*신청하면|알림\s*신청\s*이벤트를?\s*12일까지|사전\s*알림\s*신청\s*이벤트/,
+      entry:true,
+    },
     {
       url:"https://www.nhfngroup.com/user/indexSub.do?boardId=4998475&boardSeq=5902505&command=albumView&dum=dum&framePath=unknownboard&page=1&siteId=nhfngroup",
       title:"NH농협은행 가을엔 해외송금 받GO, 행운 받GO!",
@@ -109,14 +129,14 @@ export async function collectNewOfficialSource(issuer:NewlyCoveredIssuer,today:s
       return {reached:true,event:verifyNewOfficialPromotion(issuer,source,html,today)};
     }catch{return {reached:false,event:null};}
   });
-  const events=responses.flatMap(x=>x.event?[x.event]:[]);
+  const events=[...new Map(responses.flatMap(x=>x.event?[x.event]:[]).map(e=>[e.title,e])).values()];
   const reached=responses.filter(x=>x.reached).length;
   return {
     issuer,
     ok:events.length>0,
     events,
     message:events.length>0
-      ? "공식 공개 자료 "+sources.length+"곳 중 행사 내용·기간을 확인한 "+events.length+
+      ? "금융사 공식 자료·공식 발표 보도 "+sources.length+"곳 중 행사 내용·기간을 확인한 "+events.length+
         "건입니다 (접속 "+reached+"/"+sources.length+"). 일부 공개 행사만 수집합니다."
       : "공식 공개 자료 "+sources.length+"곳에서 현재 진행 중인 행사를 검증하지 못했습니다. 마지막 목록을 유지합니다.",
   };
