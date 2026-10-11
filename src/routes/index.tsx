@@ -3,7 +3,7 @@ import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { getBoard, getFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
-import { wooriAppHomeLaunchIntent, wooriAppHomeShortcutIntent, wooriEventHandoffUrl } from "@/lib/events/woori-details";
+import { eventWebDestination, WOORI_MOBILE_EVENTS_URL } from "@/lib/events/event-navigation";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
 import type { PharmaBoard } from "@/lib/pharma/types";
 import { ChangeHistory } from "@/components/change-history";
@@ -315,19 +315,9 @@ function Home() {
                 <p className="truncate text-xs leading-snug text-muted">{item.message}</p>
               </div>
               <a
-                href={item.listUrl}
-                onClick={(click) => {
+                href={item.id === "woori" ? WOORI_MOBILE_EVENTS_URL : item.listUrl}
+                onClick={item.id === "woori" ? undefined : (click) => {
                   click.preventDefault();
-                  if (item.id === "woori") {
-                    // Woori's old empty payment scheme incorrectly sent users
-                    // who already installed the app to Google Play.
-                    if (/Android/i.test(navigator.userAgent) && /Chrome|SamsungBrowser|EdgA/i.test(navigator.userAgent)) {
-                      window.location.assign(wooriAppHomeShortcutIntent());
-                    } else {
-                      window.location.assign("https://m.wooricard.com/dcmw/main.do");
-                    }
-                    return;
-                  }
                   const meta = issuerMeta(item.id);
                   openApply(item.listUrl, meta.androidPackage, "app", meta.iosAppId);
                 }}
@@ -364,13 +354,12 @@ function EventRow({
           <span className="text-[11px] font-medium text-muted">{issuerShort(event.issuer)}</span>
           <span className="text-[11px] tabular-nums text-muted">~{formatDay(event.endDate).slice(5)}</span>
           <a
-            href={event.applyUrl}
+            href={eventWebDestination(event)}
             target="_blank"
             rel="noreferrer"
-            onClick={event.issuer === "woori" ? (click) => { click.preventDefault(); onToggle(); } : undefined}
             className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            {event.issuer === "woori" ? "앱 연결" : event.entry === false ? "보기" : "응모"}
+            {event.issuer === "woori" ? "바로가기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -419,13 +408,12 @@ function EventRow({
             />
           </button>
           <a
-            href={event.applyUrl}
+            href={eventWebDestination(event)}
             target="_blank"
             rel="noreferrer"
-            onClick={event.issuer === "woori" ? (click) => { click.preventDefault(); onToggle(); } : undefined}
             className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            {event.issuer === "woori" ? "앱 연결" : event.entry === false ? "보기" : "응모"}
+            {event.issuer === "woori" ? "바로가기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -470,98 +458,19 @@ function EventBody({ event, id }: { event: EntryEvent; id: string }) {
           </ul>
         </>
       ) : null}
-      {event.issuer === "woori" ? (
-        <WooriEventOptions event={event} />
-      ) : (
-        <a
-          href={event.applyUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
-        >
-          {issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}
-          <ArrowUpRight className="size-4" />
-        </a>
-      )}
-    </div>
-  );
-}
-
-
-function WooriEventOptions({ event }: { event: EntryEvent }) {
-  const [copied, setCopied] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-  let mobileUrl: string;
-  let appHomeIntent: string;
-  try {
-    mobileUrl = wooriEventHandoffUrl(event.applyUrl);
-    appHomeIntent = wooriAppHomeLaunchIntent(event.applyUrl);
-  } catch {
-    mobileUrl = event.applyUrl;
-    appHomeIntent = "";
-  }
-
-  async function copyTitle() {
-    try {
-      await navigator.clipboard.writeText(event.title);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-      setShowHelp(true);
-    }
-  }
-
-  return (
-    <div className="mt-2.5 rounded-xl border border-line bg-card p-2.5">
-      <p className="text-xs leading-relaxed text-muted">
-        우리WON카드 앱은 이 이벤트 주소의 외부 바로 열기를 지원하지 않을 수 있습니다.
-        앱 실행은 홈 화면까지만 시도하며, 행사 제목을 복사해 앱의 혜택·이벤트 메뉴에서 찾아보세요.
-      </p>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          onClick={() => void copyTitle()}
-          className="inline-flex min-h-9 items-center rounded-full border border-line px-3 text-xs font-medium"
-        >
-          {copied ? "행사명 복사됨" : "행사명 복사"}
-        </button>
-        {appHomeIntent ? (
-          <a
-            href={appHomeIntent}
-            className="inline-flex min-h-9 items-center gap-1 rounded-full bg-accent px-3 text-xs font-medium text-accent-ink"
-          >
-            앱 실행 시도 (Android)
-            <ArrowUpRight className="size-3.5" />
-          </a>
-        ) : null}
-        <a
-          href={mobileUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-9 items-center gap-1 rounded-full border border-line px-3 text-xs font-medium"
-        >
-          행사 웹페이지
-          <ArrowUpRight className="size-3.5" />
-        </a>
-      </div>
-      <button
-        type="button"
-        onClick={() => setShowHelp((value) => !value)}
-        aria-expanded={showHelp}
-        className="mt-2 text-xs text-muted underline underline-offset-2"
+      <a
+        href={eventWebDestination(event)}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
       >
-        {showHelp ? "연결 안내 닫기" : "앱이 열리지 않을 때"}
-      </button>
-      {showHelp ? (
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          갤럭시 설정 → 애플리케이션 → 우리WON카드 → 기본으로 열기에서
-          지원되는 링크 열기를 허용해 보세요. 해당 링크를 앱이 지원하지 않는 경우에는
-          이 설정만으로 행사 화면에 이동할 수 없습니다.
-        </p>
-      ) : null}
+        {event.issuer === "woori" ? "우리카드 모바일 이벤트 바로가기" : <>{issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}</>}
+        <ArrowUpRight className="size-4" />
+      </a>
     </div>
   );
 }
+
 
 function SortButton({
   active,
