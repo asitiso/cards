@@ -17,12 +17,10 @@ export function wooriListCondition(summary: string): string[] {
 
 
 /**
- * BC Card's official partner event QR codes route WooriWONCard app-only
- * promotions through Woori's own mobile page with a target pageId.
- * This is a verified PUBLIC EVENT HANDOFF URL, not the payment URI scheme.
- *
- * Native app launch still depends on the Woori app's installed intent
- * filters and OS settings. A browser fallback must remain available.
+ * The currently accessible Woori mobile campaign detail actually contains
+ * its unique event serial (moveEvntSrno). This is the real event destination.
+ * It is preferable to Woori's old third-party QR handoff, which today returns
+ * a generic page with no event serial in its response.
  */
 export function wooriEventHandoffUrl(webUrl: string): string {
   const url=new URL(webUrl);
@@ -32,18 +30,17 @@ export function wooriEventHandoffUrl(webUrl: string): string {
   }
   const serial=url.searchParams.get("evntSrno") ?? "";
   if (!/^\d{6,12}$/.test(serial)) throw new Error("Invalid Woori campaign serial");
-  return "https://m.wooricard.com/dcmw/yh1/mlk/mlk03/M1MLK303S01.do?" +
-    "pageId=yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno="+serial;
+  return "https://m.wooricard.com/dcmw/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno="+serial;
 }
 
-/** Try WooriWONCard's verified Android package on the real mobile route;
- * if it has no matching app handler, return to the SAME mobile event page,
- * NEVER to Google Play for an app that may already be installed. */
+/** Try this official MOBILE event URL in the installed Woori Android app.
+ * If the app does not declare an event URL handler, Chrome opens this SAME
+ * mobile event page rather than incorrectly sending users to Google Play. */
 export function wooriAndroidEventIntent(mobileHandoffUrl: string): string {
   const url=new URL(mobileHandoffUrl);
   if (url.hostname !== "m.wooricard.com" ||
-      url.pathname !== "/dcmw/yh1/mlk/mlk03/M1MLK303S01.do" ||
-      !url.searchParams.get("pageId")?.startsWith("yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno=")) {
+      url.pathname !== "/dcmw/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do" ||
+      !/^\d{6,12}$/.test(url.searchParams.get("evntSrno")??"")) {
     throw new Error("Unrecognized Woori mobile event handoff");
   }
   return "intent://"+url.host+url.pathname+url.search+
