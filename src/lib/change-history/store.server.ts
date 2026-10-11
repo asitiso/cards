@@ -39,16 +39,30 @@ export async function appendChanges(
 }
 
 /** The database is the source of truth; only a small newest-first window is sent to the UI. */
-export async function recentChanges(domain: ChangeDomain): Promise<ChangeRecord[]> {
+export async function recentChanges(domain: ChangeDomain, before?: string): Promise<ChangeRecord[]> {
+  // Numeric primary key: do not sort by the SELECT alias (id::text as id).
+  // Sorting that alias alphabetically placed 99 ahead of 560 and hid newer updates.
+  if (before !== undefined && !/^[1-9]\\d{0,17}$/.test(before)) {
+    throw new Error("Invalid change history cursor");
+  }
   const sql = await getSql();
-  const rows = await sql<DbChangeRow>`
-    select id::text as id, domain, source_id, event_id, action, title,
-           fields::text as fields, changed_at::text as changed_at
-    from cards_private.change_history
-    where domain = ${domain}
-    order by id desc
-    limit 60
-  `;
+  const rows = before
+    ? await sql<DbChangeRow>`
+        select id::text as id, domain, source_id, event_id, action, title,
+               fields::text as fields, changed_at::text as changed_at
+        from cards_private.change_history
+        where domain = ${domain} and cards_private.change_history.id < ${before}::bigint
+        order by cards_private.change_history.id desc
+        limit 60
+      `
+    : await sql<DbChangeRow>`
+        select id::text as id, domain, source_id, event_id, action, title,
+               fields::text as fields, changed_at::text as changed_at
+        from cards_private.change_history
+        where domain = ${domain}
+        order by cards_private.change_history.id desc
+        limit 60
+      `;
   return rows.map((row) => ({
     id: row.id,
     domain: row.domain,
