@@ -7,6 +7,7 @@ test("Woori campaign buttons use its official Android and iOS app identifiers",(
     androidPackage:"com.wooricard.smartapp",
     iosAppId:"1499598869",
     mode:"app",
+    appScheme:"com.wooricard.wcard",
   });
 });
 test("Other card, bank and securities campaign actions retain their original web behavior",()=>{
