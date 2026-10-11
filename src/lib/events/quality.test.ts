@@ -62,3 +62,21 @@ test("Woori Card list-only reward copy is not retained as an eligibility require
     conditions:[],detailUnverified:true};
   assert.deepEqual(mergeUnverifiedDetails(previous,incoming).conditions,[]);
 });
+
+
+test("keep a single missing ongoing promotion even if the batch drop is below existing threshold", async () => {
+ const { unconfirmedOngoing, suspiciousMissingOngoing } = await import("./quality.ts");
+ const old = Array.from({ length: 20 }, (_, i) => ({ id: "mirae:" + i, endDate: "2026-10-31" }));
+ const next = old.slice(1);
+ assert.equal(suspiciousMissingOngoing(old, next, "2026-10-11").suspicious, false);
+ assert.deepEqual(unconfirmedOngoing(old, next, "2026-10-11"), [old[0]]);
+});
+test("missing expired events may be removed, but current ongoing campaigns are retained", async () => {
+ const { unconfirmedOngoing } = await import("./quality.ts");
+ const old = [
+   { id:"bc:ongoing", endDate:"2026-10-31" },
+   { id:"bc:expired", endDate:"2026-10-09" },
+   { id:"bc:still-present", endDate:"2026-10-31" },
+ ];
+ assert.deepEqual(unconfirmedOngoing(old,[{ id:"bc:still-present" }],"2026-10-11"),[old[0]]);
+});
