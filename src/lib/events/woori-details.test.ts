@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { wooriDetailUrl, wooriListCondition, wooriEventHandoffUrl, wooriAndroidEventIntent, wooriAppHomeLaunchIntent } from "./woori-details.ts";
+import { wooriDetailUrl, wooriListCondition, wooriEventHandoffUrl, wooriAndroidEventIntent, wooriAppHomeLaunchIntent, wooriAppHomeShortcutIntent } from "./woori-details.ts";
 
 test("Woori public event serial resolves to its own detail, not the whole list", () => {
   assert.equal(wooriDetailUrl("30006298"),
@@ -54,4 +54,11 @@ test("Woori app home launch intent does not masquerade as an event deep link",()
 test("Woori launcher rejects outside hosts and injected event IDs",()=>{
   assert.throws(()=>wooriAppHomeLaunchIntent("https://evil.example/event?id=30006298"));
   assert.throws(()=>wooriAppHomeLaunchIntent("https://m.wooricard.com/dcmw/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno=evil"));
+});
+
+test("Woori issuer shortcut attempts home launcher and falls back to official mobile home",()=>{
+  const intent=wooriAppHomeShortcutIntent();
+  assert.match(intent,/package=com\.wooricard\.smartapp/);
+  assert.ok(intent.includes("S.browser_fallback_url="+encodeURIComponent("https://m.wooricard.com/dcmw/main.do")));
+  assert.equal(intent.includes("play.google.com"),false);
 });
