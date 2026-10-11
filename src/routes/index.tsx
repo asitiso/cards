@@ -3,7 +3,7 @@ import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { getBoard, getFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
-import { eventAppLaunch } from "@/lib/events/event-navigation";
+import { wooriAndroidEventIntent, wooriEventHandoffUrl } from "@/lib/events/woori-details";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
 import type { PharmaBoard } from "@/lib/pharma/types";
 import { ChangeHistory } from "@/components/change-history";
@@ -318,9 +318,14 @@ function Home() {
                 href={item.listUrl}
                 onClick={(click) => {
                   click.preventDefault();
+                  if (item.id === "woori") {
+                    // Woori's old empty payment scheme incorrectly sent users
+                    // who already installed the app to Google Play.
+                    window.location.assign("https://m.wooricard.com/dcmw/main.do");
+                    return;
+                  }
                   const meta = issuerMeta(item.id);
-                  const wooriApp = eventAppLaunch(item.id);
-                  openApply(item.listUrl, meta.androidPackage, "app", meta.iosAppId, wooriApp?.appScheme);
+                  openApply(item.listUrl, meta.androidPackage, "app", meta.iosAppId);
                 }}
                 className="inline-flex h-7 shrink-0 items-center gap-0.5 text-xs font-medium text-accent"
               >
@@ -336,12 +341,24 @@ function Home() {
 }
 
 function openEventAction(event: EntryEvent, click: MouseEvent<HTMLAnchorElement>) {
-  const target = eventAppLaunch(event.issuer);
-  // Keep standard open-in-new-tab for modifier clicks and other institutions.
-  if (!target || click.button !== 0 || click.metaKey || click.ctrlKey ||
-      click.shiftKey || click.altKey) return;
+  // This route is sourced from Woori's official partner event QR codes, NOT
+  // from the payment-only URI scheme that sent installed users to Google Play.
+  // On unsupported devices the exact individual event remains accessible.
+  if (event.issuer !== "woori" || click.button !== 0 || click.metaKey ||
+      click.ctrlKey || click.shiftKey || click.altKey) return;
+  const ua=navigator.userAgent;
+  if (!/Android|iPhone|iPad|iPod/i.test(ua)) return;
   click.preventDefault();
-  openApply(event.applyUrl, target.androidPackage, target.mode, target.iosAppId, target.appScheme);
+  try {
+    const mobile=wooriEventHandoffUrl(event.applyUrl);
+    if (/Android/i.test(ua) && /Chrome|EdgA|SamsungBrowser/i.test(ua)) {
+      window.location.assign(wooriAndroidEventIntent(mobile));
+    } else {
+      window.location.assign(mobile);
+    }
+  } catch {
+    window.location.assign(event.applyUrl);
+  }
 }
 
 function EventRow({
@@ -370,7 +387,7 @@ function EventRow({
             onClick={(click) => openEventAction(event, click)}
             className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            {event.issuer === "woori" ? "앱 열기" : event.entry === false ? "보기" : "응모"}
+            {event.issuer === "woori" ? "이벤트 열기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -425,7 +442,7 @@ function EventRow({
             onClick={(click) => openEventAction(event, click)}
             className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            {event.issuer === "woori" ? "앱 열기" : event.entry === false ? "보기" : "응모"}
+            {event.issuer === "woori" ? "이벤트 열기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -477,7 +494,7 @@ function EventBody({ event, id }: { event: EntryEvent; id: string }) {
         onClick={(click) => openEventAction(event, click)}
         className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
       >
-        {event.issuer === "woori" ? "우리WON카드 앱 열기" : <>{issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}</>}
+        {event.issuer === "woori" ? "우리카드 이벤트 열기" : <>{issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}</>}
         <ArrowUpRight className="size-4" />
       </a>
     </div>
