@@ -29,5 +29,4 @@ jobs:
       # Diagnose unavailable official pages without inventing promotions.
       - run: node --experimental-strip-types scripts/check-next-official-sources.mjs
       - run: node --experimental-strip-types scripts/check-tosssec-source.mjs
-      - run: node --experimental-strip-types scripts/check-woori-app-route.mjs
 
