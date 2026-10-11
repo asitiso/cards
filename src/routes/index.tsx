@@ -319,7 +319,8 @@ function Home() {
                 onClick={(click) => {
                   click.preventDefault();
                   const meta = issuerMeta(item.id);
-                  openApply(item.listUrl, meta.androidPackage, "app", meta.iosAppId);
+                  const wooriApp = eventAppLaunch(item.id);
+                  openApply(item.listUrl, meta.androidPackage, "app", meta.iosAppId, wooriApp?.appScheme);
                 }}
                 className="inline-flex h-7 shrink-0 items-center gap-0.5 text-xs font-medium text-accent"
               >
@@ -340,7 +341,7 @@ function openEventAction(event: EntryEvent, click: MouseEvent<HTMLAnchorElement>
   if (!target || click.button !== 0 || click.metaKey || click.ctrlKey ||
       click.shiftKey || click.altKey) return;
   click.preventDefault();
-  openApply(event.applyUrl, target.androidPackage, target.mode, target.iosAppId);
+  openApply(event.applyUrl, target.androidPackage, target.mode, target.iosAppId, target.appScheme);
 }
 
 function EventRow({
