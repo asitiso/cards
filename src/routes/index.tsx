@@ -176,6 +176,7 @@ function Home() {
               onClick={() => {
                 setMarket(item.id);
                 setIssuer("all");
+                setScope("all");
                 setQuery("");
                 setOpenIds([]);
                 setShowAllIssuers(false);
