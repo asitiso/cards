@@ -1,4 +1,4 @@
-import { getSql } from "@/lib/db";
+import { getSql, type Sql } from "@/lib/db";
 import type { ChangeDomain, ChangeDraft, ChangeRecord } from "./types.ts";
 
 type DbChangeRow = {
@@ -17,9 +17,10 @@ export async function appendChanges(
   domain: ChangeDomain,
   sourceId: string,
   drafts: readonly ChangeDraft[],
+  transactionSql?: Sql,
 ): Promise<void> {
   if (drafts.length === 0) return;
-  const sql = await getSql();
+  const sql = transactionSql ?? await getSql();
 
   // Chunk to keep parameter counts and SQL payloads small.
   for (let start = 0; start < drafts.length; start += 80) {
