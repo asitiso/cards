@@ -57,10 +57,18 @@ export function wooriAndroidEventIntent(mobileHandoffUrl: string): string {
  * EXACT mobile event instead of Google Play. Never claims to open the event
  * inside the app, and never forwards arbitrary unverified app parameters.
  */
-export function wooriAppHomeLaunchIntent(webUrl: string): string {
-  const mobileEvent = wooriEventHandoffUrl(webUrl);
+function buildWooriAppHomeIntent(fallbackUrl: string): string {
   return "intent://#Intent;action=android.intent.action.MAIN;" +
     "category=android.intent.category.LAUNCHER;" +
     "package=com.wooricard.smartapp;" +
-    "S.browser_fallback_url=" + encodeURIComponent(mobileEvent) + ";end";
+    "S.browser_fallback_url=" + encodeURIComponent(fallbackUrl) + ";end";
+}
+
+export function wooriAppHomeLaunchIntent(webUrl: string): string {
+  return buildWooriAppHomeIntent(wooriEventHandoffUrl(webUrl));
+}
+
+/** Issuer-level shortcut: no campaign serial, fallback stays on official home. */
+export function wooriAppHomeShortcutIntent(): string {
+  return buildWooriAppHomeIntent("https://m.wooricard.com/dcmw/main.do");
 }
