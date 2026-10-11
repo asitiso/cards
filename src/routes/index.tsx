@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
+import { ArrowUpRight, ChevronDown, RefreshCw, Search, X } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
-import { getBoard, getFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
+import { getBoard, getFinanceChanges, getOlderFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
 import { eventWebDestination, WOORI_MOBILE_EVENTS_URL } from "@/lib/events/event-navigation";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
@@ -31,6 +31,7 @@ function Home() {
   const [sort, setSort] = useState<"soon" | "new">("soon");
   const [scope, setScope] = useState<"entry" | "all" | "other">("all");
   const [query, setQuery] = useState("");
+  const [showAllIssuers, setShowAllIssuers] = useState(false);
   const [openIds, setOpenIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -160,7 +161,7 @@ function Home() {
 
       {error ? <p className="mt-2 text-sm text-accent">{error}</p> : null}
 
-      <ChangeHistory key={board.collectedAt} changes={board.changes} loadChanges={getFinanceChanges} sourceName={issuerName} />
+      <ChangeHistory key={board.collectedAt} changes={board.changes} loadChanges={getFinanceChanges} loadOlderChanges={(before) => getOlderFinanceChanges({ data: { before } })} sourceName={issuerName} />
 
       <div className="mt-3 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5" role="tablist" aria-label="종류">
         {MARKETS.map((item) => {
@@ -175,6 +176,10 @@ function Home() {
               onClick={() => {
                 setMarket(item.id);
                 setIssuer("all");
+                setScope("all");
+                setQuery("");
+                setOpenIds([]);
+                setShowAllIssuers(false);
               }}
               className={
                 active
@@ -226,8 +231,16 @@ function Home() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="혜택, 회사, 조건"
+            aria-label="행사 검색"
             className="w-full bg-transparent text-base leading-none outline-none placeholder:text-muted sm:text-sm"
           />
+          {query ? (
+            <button type="button" onClick={() => setQuery("")}
+              aria-label="검색어 지우기" title="검색어 지우기"
+              className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted hover:text-ink">
+              <X className="size-3.5" />
+            </button>
+          ) : null}
         </label>
         <div className="flex h-8 shrink-0 rounded-full border border-line bg-card p-0.5">
           <SortButton active={sort === "soon"} onClick={() => setSort("soon")}>
@@ -241,25 +254,37 @@ function Home() {
         </div>
       </div>
 
-      <div className="-mx-3 mt-2 flex gap-1.5 overflow-x-auto px-3 pb-0.5 sm:mx-0 sm:px-0">
-        <Chip active={issuer === "all"} onClick={() => setIssuer("all")}>
-          전체 {scoped.filter((event) => issuerMeta(event.issuer).market === market).length}
-        </Chip>
-        {ISSUERS.filter((item) => item.market === market).map((item) => {
-          const count = scoped.filter((event) => event.issuer === item.id).length;
-          return (
-            <Chip key={item.id} active={issuer === item.id} onClick={() => setIssuer(item.id)}>
-              {item.short} {count}
-              {count === 0 && board.issuers.find((report) => report.id === item.id)?.ok === false
-                ? <span className="text-accent" aria-label="수집 확인 필요"> · 확인</span>
-                : null}
-            </Chip>
-          );
-        })}
+      <div className="mt-2">
+        <div className={showAllIssuers
+          ? "flex flex-wrap gap-1.5"
+          : "-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 sm:mx-0 sm:px-0"}
+          aria-label="금융사 선택">
+          <Chip active={issuer === "all"} onClick={() => setIssuer("all")}>
+            전체 {scoped.filter((event) => issuerMeta(event.issuer).market === market).length}
+          </Chip>
+          {ISSUERS.filter((item) => item.market === market).map((item) => {
+            const count = scoped.filter((event) => event.issuer === item.id).length;
+            return (
+              <Chip key={item.id} active={issuer === item.id} onClick={() => setIssuer(item.id)}>
+                {item.short} {count}
+                {count === 0 && board.issuers.find((report) => report.id === item.id)?.ok === false
+                  ? <span className="text-accent" aria-label="수집 확인 필요"> · 확인</span>
+                  : null}
+              </Chip>
+            );
+          })}
+        </div>
+        <button type="button" onClick={() => setShowAllIssuers((current) => !current)}
+          aria-expanded={showAllIssuers}
+          className="mt-1 flex w-full items-center justify-center gap-1 rounded-lg py-1 text-xs text-muted">
+          {showAllIssuers ? "금융사 접기" : "금융사 전체 펼치기"}
+          <ChevronDown className={`size-3.5 transition-transform ${showAllIssuers ? "rotate-180" : ""}`} />
+        </button>
       </div>
 
       <p className="mt-2 text-xs text-muted">
         {visible.length}건
+        {query.trim() ? ` · 검색 “${query.trim()}” 적용 중` : ""}
         {issuer === "all" && uncheckedIssuers.length > 0
           ? ` · 수집 확인 필요 ${uncheckedIssuers.length}곳`
           : null}

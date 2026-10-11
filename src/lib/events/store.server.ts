@@ -1,6 +1,6 @@
 import { getSql, dbSource } from "@/lib/db";
 import { diffEventLists } from "@/lib/change-history/diff";
-import { suddenDrop, suspiciousMissingOngoing, mergeUnverifiedDetails } from "./quality";
+import { suddenDrop, suspiciousMissingOngoing, mergeUnverifiedDetails, unconfirmedOngoing } from "./quality";
 import { appendChanges } from "@/lib/change-history/store.server";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
@@ -238,73 +238,98 @@ export async function refreshBoard(): Promise<Board> {
   const today = seoulToday();
   const hits = await collectLive(today);
   const collectedAt = new Date().toISOString();
+  // Warning states are collection-only. The saved last-known-good records stay visible.
+  const coverageWarnings = new Map<IssuerId, string>();
   for (const hit of hits) {
-    // A failing or unexpectedly empty scraper must never erase a saved list.
     if (!hit.ok || hit.events.length === 0) continue;
-    const previousRows = await sql<EventRow>`
-      select id, issuer, title, summary, benefit, conditions, exclusions,
-             start_date::text as start_date, end_date::text as end_date,
-             apply_url, list_url, entry
-      from entry_events where issuer = ${hit.issuer} and active = true
-    `;
-    const previousEvents = previousRows.map(toEvent);
-    const previousOngoing = previousEvents.filter((event) => event.endDate >= today).length;
-    if (suddenDrop(previousOngoing, hit.events.length)) {
-      // A site can return a valid-looking but truncated page during outages or
-      // layout changes. Never turn this into false "removed" change-history rows.
-      hit.ok = false;
-      hit.message = `진행 중 ${previousOngoing}건에서 ${hit.events.length}건으로 급감해 수집 검증이 필요합니다.`;
-      hit.events = [];
-      continue;
-    }
-    const missing = suspiciousMissingOngoing(previousEvents, hit.events, today);
-    if (missing.suspicious) {
-      // Even a valid-looking partial page can omit 3+ ongoing promotions.
-      // Block false removed-history records until a complete response arrives.
-      hit.ok = false;
-      hit.message = `기존 진행 행사 ${missing.total}건 중 ${missing.missing}건이 새 목록에서 누락되어 수집 확인이 필요합니다.`;
-      hit.events = [];
-      continue;
-    }
-    const previousById = new Map(previousEvents.map((event) => [event.id, event]));
-    const confirmedEvents = hit.events.map((event) =>
-      mergeUnverifiedDetails(previousById.get(event.id), event),
-    );
-    await sql`update entry_events set active = false where issuer = ${hit.issuer}`;
-    for (const event of confirmedEvents) {
-      await sql`
-        insert into entry_events (
-          id, issuer, title, summary, benefit, conditions, exclusions,
-          start_date, end_date, apply_url, list_url, active, collected_at, entry
-        ) values (
-          ${event.id}, ${event.issuer}, ${event.title}, ${event.summary}, ${event.benefit},
-          ${JSON.stringify(event.conditions)}, ${JSON.stringify(event.exclusions)},
-          ${event.startDate}, ${event.endDate}, ${event.applyUrl}, ${event.listUrl},
-          true, ${collectedAt}, ${event.entry !== false}
-        )
-        on conflict (id) do update set
-          title = excluded.title,
-          summary = excluded.summary,
-          benefit = excluded.benefit,
-          conditions = excluded.conditions,
-          exclusions = excluded.exclusions,
-          start_date = excluded.start_date,
-          end_date = excluded.end_date,
-          apply_url = excluded.apply_url,
-          list_url = excluded.list_url,
-          active = true,
-          collected_at = excluded.collected_at,
-          entry = excluded.entry
+
+    // Atomic per-issuer snapshot: a failed upsert or change-history insert
+    // ROLLS BACK every update. Do not bulk-disable active events up front.
+    const result = await sql.transaction(async (tx) => {
+      const previousRows = await tx<EventRow>`
+        select id, issuer, title, summary, benefit, conditions, exclusions,
+               start_date::text as start_date, end_date::text as end_date,
+               apply_url, list_url, entry
+        from entry_events where issuer = ${hit.issuer} and active = true
       `;
+      const previousEvents = previousRows.map(toEvent);
+      const previousOngoing = previousEvents.filter((event) => event.endDate >= today).length;
+      if (suddenDrop(previousOngoing, hit.events.length)) {
+        return { rejected: `진행 중 ${previousOngoing}건에서 ${hit.events.length}건으로 급감해 수집 검증이 필요합니다.`, warning: "" };
+      }
+      const missing = suspiciousMissingOngoing(previousEvents, hit.events, today);
+      if (missing.suspicious) {
+        return { rejected: `기존 진행 행사 ${missing.total}건 중 ${missing.missing}건이 새 목록에서 누락되어 수집 확인이 필요합니다.`, warning: "" };
+      }
+      const previousById = new Map(previousEvents.map((event) => [event.id, event]));
+      const incoming = hit.events.map((event) =>
+        mergeUnverifiedDetails(previousById.get(event.id), event),
+      );
+
+      // Even one missing ongoing event must NOT be treated as a confirmed
+      // removal: listing endpoints can omit individual campaigns temporarily.
+      // Keep that last verified event active and ask for source verification.
+      const newIds = new Set(incoming.map((event) => event.id));
+      const retained = unconfirmedOngoing(previousEvents, incoming, today);
+      for (const event of incoming) {
+        await tx`
+          insert into entry_events (
+            id, issuer, title, summary, benefit, conditions, exclusions,
+            start_date, end_date, apply_url, list_url, active, collected_at, entry
+          ) values (
+            ${event.id}, ${event.issuer}, ${event.title}, ${event.summary}, ${event.benefit},
+            ${JSON.stringify(event.conditions)}, ${JSON.stringify(event.exclusions)},
+            ${event.startDate}, ${event.endDate}, ${event.applyUrl}, ${event.listUrl},
+            true, ${collectedAt}, ${event.entry !== false}
+          )
+          on conflict (id) do update set
+            title = excluded.title,
+            summary = excluded.summary,
+            benefit = excluded.benefit,
+            conditions = excluded.conditions,
+            exclusions = excluded.exclusions,
+            start_date = excluded.start_date,
+            end_date = excluded.end_date,
+            apply_url = excluded.apply_url,
+            list_url = excluded.list_url,
+            active = true,
+            collected_at = excluded.collected_at,
+            entry = excluded.entry
+        `;
+      }
+      // Only records no longer present AND expired may be deactivated.
+      // All other previously active events (even if omitted) remain visible.
+      await tx.query(
+        `update entry_events set active = false
+         where issuer = $1 and active = true and end_date < $2
+           and not (id = any($3::text[]))`,
+        [hit.issuer, today, [...newIds]],
+      );
+
+      const normalizedEvents = [...incoming, ...retained].map(
+        (event) => ({ ...event, entry: event.entry !== false }),
+      );
+      const changes = diffEventLists(previousEvents, normalizedEvents, [
+        ["title", "제목"], ["summary", "내용"], ["benefit", "혜택"],
+        ["conditions", "조건"], ["exclusions", "유의사항"], ["startDate", "시작일"],
+        ["endDate", "종료일"], ["applyUrl", "링크"], ["entry", "응모 여부"],
+      ]);
+      await appendChanges("finance", hit.issuer, changes, tx);
+      return {
+        rejected: "",
+        warning: retained.length
+          ? `진행 중인 기존 행사 ${retained.length}건이 새 목록에서 확인되지 않아 삭제하지 않고 보존했습니다. 수집 확인이 필요합니다.`
+          : "",
+      };
+    });
+
+    if (result.rejected) {
+      hit.ok = false;
+      hit.message = result.rejected;
+      hit.events = [];
+    } else if (result.warning) {
+      coverageWarnings.set(hit.issuer, result.warning);
     }
-    // The collection type makes entry optional; the database stores true by default.
-    const normalizedEvents = confirmedEvents.map((event) => ({ ...event, entry: event.entry !== false }));
-    const changes = diffEventLists(previousEvents, normalizedEvents, [
-      ["title", "제목"], ["summary", "내용"], ["benefit", "혜택"],
-      ["conditions", "조건"], ["exclusions", "유의사항"], ["startDate", "시작일"],
-      ["endDate", "종료일"], ["applyUrl", "링크"], ["entry", "응모 여부"],
-    ]);
-    await appendChanges("finance", hit.issuer, changes);
   }
   const previous = await sql<{ report: string }>`select report from collect_state where id = 1`;
   let prior: { id: IssuerId; ok: boolean; message: string; count: number }[] = [];
@@ -317,10 +342,12 @@ export async function refreshBoard(): Promise<Board> {
   for (const hit of hits) {
     merged.push({
       id: hit.issuer,
-      ok: hit.ok,
-      message: hit.ok && hit.events.length > 0
-        ? hit.message
-        : `${hit.message} 마지막 목록을 유지합니다.`,
+      ok: hit.ok && !coverageWarnings.has(hit.issuer),
+      message: coverageWarnings.has(hit.issuer)
+        ? `${hit.message} ${coverageWarnings.get(hit.issuer)}`
+        : hit.ok && hit.events.length > 0
+          ? hit.message
+          : `${hit.message} 마지막 목록을 유지합니다.`,
       count: hit.ok && hit.events.length > 0
         ? hit.events.length
         : (prior.find((item) => item.id === hit.issuer)?.count ?? 0),

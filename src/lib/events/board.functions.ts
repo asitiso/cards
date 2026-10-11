@@ -8,3 +8,8 @@ export const reloadBoard = createServerFn({ method: "POST" }).handler(async () =
 
 /** Fetch the newest change history only when its panel is opened. */
 export const getFinanceChanges = createServerFn({ method: "GET" }).handler(async () => recentChanges("finance"));
+
+/** Cursor pagination without sending all historical records on the homepage. */
+export const getOlderFinanceChanges = createServerFn({ method: "GET" })
+  .validator((data: { before: string }) => ({ before: String(data?.before ?? "") }))
+  .handler(async ({ data }) => recentChanges("finance", data.before));
