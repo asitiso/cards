@@ -14,3 +14,36 @@ export function wooriListCondition(summary: string): string[] {
   if (!/(?:\d[\d,]*\s*만원\s*이상\s*(?:이용|결제)|\d[\d,]*\s*원\s*이상\s*(?:이용|결제)|응모\s*(?:필수|후)|전월\s*실적|참여\s*대상|대상\s*카드)/.test(text)) return [];
   return [text.slice(0, 180)];
 }
+
+
+/**
+ * The currently accessible Woori mobile campaign detail actually contains
+ * its unique event serial (moveEvntSrno). This is the real event destination.
+ * It is preferable to Woori's old third-party QR handoff, which today returns
+ * a generic page with no event serial in its response.
+ */
+export function wooriEventHandoffUrl(webUrl: string): string {
+  const url=new URL(webUrl);
+  if (!["pc.wooricard.com","m.wooricard.com"].includes(url.hostname) ||
+      !url.pathname.endsWith("/prgevnt/movePrgEvntDtl.do")) {
+    throw new Error("Unrecognized official Woori campaign detail");
+  }
+  const serial=url.searchParams.get("evntSrno") ?? "";
+  if (!/^\d{6,12}$/.test(serial)) throw new Error("Invalid Woori campaign serial");
+  return "https://m.wooricard.com/dcmw/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno="+serial;
+}
+
+/** Try this official MOBILE event URL in the installed Woori Android app.
+ * If the app does not declare an event URL handler, Chrome opens this SAME
+ * mobile event page rather than incorrectly sending users to Google Play. */
+export function wooriAndroidEventIntent(mobileHandoffUrl: string): string {
+  const url=new URL(mobileHandoffUrl);
+  if (url.hostname !== "m.wooricard.com" ||
+      url.pathname !== "/dcmw/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do" ||
+      !/^\d{6,12}$/.test(url.searchParams.get("evntSrno")??"")) {
+    throw new Error("Unrecognized Woori mobile event handoff");
+  }
+  return "intent://"+url.host+url.pathname+url.search+
+    "#Intent;scheme=https;package=com.wooricard.smartapp;"+
+    "S.browser_fallback_url="+encodeURIComponent(url.href)+";end";
+}
