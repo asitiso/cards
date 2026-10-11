@@ -1,6 +1,6 @@
 import { getSql, dbSource } from "@/lib/db";
 import { diffEventLists } from "@/lib/change-history/diff";
-import { suddenDrop, suspiciousMissingOngoing, mergeUnverifiedDetails } from "./quality";
+import { suddenDrop, suspiciousMissingOngoing, mergeUnverifiedDetails, unconfirmedOngoing } from "./quality";
 import { appendChanges } from "@/lib/change-history/store.server";
 import { collectLive } from "./http-collect.ts";
 import { seoulToday } from "./html.ts";
@@ -270,9 +270,7 @@ export async function refreshBoard(): Promise<Board> {
       // removal: listing endpoints can omit individual campaigns temporarily.
       // Keep that last verified event active and ask for source verification.
       const newIds = new Set(incoming.map((event) => event.id));
-      const retained = previousEvents.filter(
-        (event) => event.endDate >= today && !newIds.has(event.id),
-      );
+      const retained = unconfirmedOngoing(previousEvents, incoming, today);
       for (const event of incoming) {
         await tx`
           insert into entry_events (
