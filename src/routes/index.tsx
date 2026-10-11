@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
-import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { getBoard, getFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
+import { eventAppLaunch } from "@/lib/events/event-navigation";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
 import type { PharmaBoard } from "@/lib/pharma/types";
 import { ChangeHistory } from "@/components/change-history";
@@ -333,6 +334,15 @@ function Home() {
   );
 }
 
+function openEventAction(event: EntryEvent, click: MouseEvent<HTMLAnchorElement>) {
+  const target = eventAppLaunch(event.issuer);
+  // Keep standard open-in-new-tab for modifier clicks and other institutions.
+  if (!target || click.button !== 0 || click.metaKey || click.ctrlKey ||
+      click.shiftKey || click.altKey) return;
+  click.preventDefault();
+  openApply(event.applyUrl, target.androidPackage, target.mode, target.iosAppId);
+}
+
 function EventRow({
   event,
   today,
@@ -356,9 +366,10 @@ function EventRow({
             href={event.applyUrl}
             target="_blank"
             rel="noreferrer"
+            onClick={(click) => openEventAction(event, click)}
             className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            {event.entry === false ? "보기" : "응모"}
+            {event.issuer === "woori" ? "앱 열기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -410,9 +421,10 @@ function EventRow({
             href={event.applyUrl}
             target="_blank"
             rel="noreferrer"
+            onClick={(click) => openEventAction(event, click)}
             className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
           >
-            {event.entry === false ? "보기" : "응모"}
+            {event.issuer === "woori" ? "앱 열기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
           </a>
         </div>
@@ -461,9 +473,10 @@ function EventBody({ event, id }: { event: EntryEvent; id: string }) {
         href={event.applyUrl}
         target="_blank"
         rel="noreferrer"
+        onClick={(click) => openEventAction(event, click)}
         className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
       >
-        {issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}
+        {event.issuer === "woori" ? "우리WON카드 앱 열기" : <>{issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}</>}
         <ArrowUpRight className="size-4" />
       </a>
     </div>
