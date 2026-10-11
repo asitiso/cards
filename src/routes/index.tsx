@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowUpRight, ChevronDown, RefreshCw, Search, X } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
-import { getBoard, getFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
+import { getBoard, getFinanceChanges, getOlderFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
 import { eventWebDestination, WOORI_MOBILE_EVENTS_URL } from "@/lib/events/event-navigation";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
@@ -161,7 +161,7 @@ function Home() {
 
       {error ? <p className="mt-2 text-sm text-accent">{error}</p> : null}
 
-      <ChangeHistory key={board.collectedAt} changes={board.changes} loadChanges={getFinanceChanges} sourceName={issuerName} />
+      <ChangeHistory key={board.collectedAt} changes={board.changes} loadChanges={getFinanceChanges} loadOlderChanges={(before) => getOlderFinanceChanges({ data: { before } })} sourceName={issuerName} />
 
       <div className="mt-3 grid grid-cols-3 gap-1 rounded-full border border-line bg-card p-0.5" role="tablist" aria-label="종류">
         {MARKETS.map((item) => {
