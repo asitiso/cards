@@ -3,7 +3,7 @@ import { ArrowUpRight, ChevronDown, RefreshCw, Search } from "lucide-react";
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { getBoard, getFinanceChanges, reloadBoard } from "@/lib/events/board.functions";
 import { openApply } from "@/lib/events/open-apply";
-import { wooriAppHomeLaunchIntent, wooriEventHandoffUrl } from "@/lib/events/woori-details";
+import { wooriAppHomeLaunchIntent, wooriAppHomeShortcutIntent, wooriEventHandoffUrl } from "@/lib/events/woori-details";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
 import type { PharmaBoard } from "@/lib/pharma/types";
 import { ChangeHistory } from "@/components/change-history";
@@ -321,7 +321,11 @@ function Home() {
                   if (item.id === "woori") {
                     // Woori's old empty payment scheme incorrectly sent users
                     // who already installed the app to Google Play.
-                    window.location.assign("https://m.wooricard.com/dcmw/main.do");
+                    if (/Android/i.test(navigator.userAgent) && /Chrome|SamsungBrowser|EdgA/i.test(navigator.userAgent)) {
+                      window.location.assign(wooriAppHomeShortcutIntent());
+                    } else {
+                      window.location.assign("https://m.wooricard.com/dcmw/main.do");
+                    }
                     return;
                   }
                   const meta = issuerMeta(item.id);
