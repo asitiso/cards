@@ -74,6 +74,18 @@ export function suspiciousMissingOngoing(
 }
 
 
+/** Preserve any still-in-period campaign missing from a new source batch.
+ * Only an independently verified expiry (or explicit status evidence) may
+ * remove it; scraper omissions alone are never proof of termination. */
+export function unconfirmedOngoing<T extends { id: string; endDate: string }>(
+  previous: readonly T[],
+  incoming: readonly { id: string }[],
+  today: string,
+): T[] {
+  const seen = new Set(incoming.map((event) => event.id));
+  return previous.filter((event) => event.endDate >= today && !seen.has(event.id));
+}
+
 /** Keep known terms when only a title/list preview was read this time.
  * Never retain previous details when campaign title or dates have changed.
  * Actual re-verified detail pages always take precedence. */
