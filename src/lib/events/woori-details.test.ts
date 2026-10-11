@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { wooriDetailUrl, wooriListCondition, wooriEventHandoffUrl, wooriAndroidEventIntent } from "./woori-details.ts";
+import { wooriDetailUrl, wooriListCondition, wooriEventHandoffUrl, wooriAndroidEventIntent, wooriAppHomeLaunchIntent, wooriAppHomeShortcutIntent } from "./woori-details.ts";
 
 test("Woori public event serial resolves to its own detail, not the whole list", () => {
   assert.equal(wooriDetailUrl("30006298"),
@@ -36,4 +36,29 @@ test("Campaign mobile link only accepts Woori-owned routes and numeric serials",
   assert.throws(()=>wooriEventHandoffUrl("https://bad.example/prgevnt/movePrgEvntDtl.do?evntSrno=30006298"));
   assert.throws(()=>wooriEventHandoffUrl("https://pc.wooricard.com/dcpc/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno=1%3Bpackage%3Devil"));
   assert.throws(()=>wooriAndroidEventIntent("https://unknown.example/event?id=30006298"));
+});
+
+
+test("Woori app home launch intent does not masquerade as an event deep link",()=>{
+  const serial="30006298";
+  const page=wooriDetailUrl(serial);
+  const intent=wooriAppHomeLaunchIntent(page);
+  assert.match(intent,/^intent:\/\/#Intent;action=android\.intent\.action\.MAIN;/);
+  assert.match(intent,/category=android\.intent\.category\.LAUNCHER/);
+  assert.match(intent,/package=com\.wooricard\.smartapp/);
+  assert.equal(intent.includes("com.wooricard.wcard"),false);
+  assert.equal(intent.includes("play.google.com"),false);
+  assert.ok(intent.includes("S.browser_fallback_url="+encodeURIComponent(wooriEventHandoffUrl(page))));
+  assert.notEqual(wooriAppHomeLaunchIntent(wooriDetailUrl("30006323")),intent);
+});
+test("Woori launcher rejects outside hosts and injected event IDs",()=>{
+  assert.throws(()=>wooriAppHomeLaunchIntent("https://evil.example/event?id=30006298"));
+  assert.throws(()=>wooriAppHomeLaunchIntent("https://m.wooricard.com/dcmw/yh1/bnf/bnf02/prgevnt/movePrgEvntDtl.do?evntSrno=evil"));
+});
+
+test("Woori issuer shortcut attempts home launcher and falls back to official mobile home",()=>{
+  const intent=wooriAppHomeShortcutIntent();
+  assert.match(intent,/package=com\.wooricard\.smartapp/);
+  assert.ok(intent.includes("S.browser_fallback_url="+encodeURIComponent("https://m.wooricard.com/dcmw/main.do")));
+  assert.equal(intent.includes("play.google.com"),false);
 });

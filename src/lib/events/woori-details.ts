@@ -47,3 +47,28 @@ export function wooriAndroidEventIntent(mobileHandoffUrl: string): string {
     "#Intent;scheme=https;package=com.wooricard.smartapp;"+
     "S.browser_fallback_url="+encodeURIComponent(url.href)+";end";
 }
+
+
+/**
+ * Experimental app HOME launch, independent of the event deep link.
+ * Unlike the payment-only custom scheme and the https event ACTION_VIEW,
+ * this asks Android for WooriWONCard's launch activity. Chrome only permits
+ * exported BROWSABLE activities: when unsupported, the fallback opens the
+ * EXACT mobile event instead of Google Play. Never claims to open the event
+ * inside the app, and never forwards arbitrary unverified app parameters.
+ */
+function buildWooriAppHomeIntent(fallbackUrl: string): string {
+  return "intent://#Intent;action=android.intent.action.MAIN;" +
+    "category=android.intent.category.LAUNCHER;" +
+    "package=com.wooricard.smartapp;" +
+    "S.browser_fallback_url=" + encodeURIComponent(fallbackUrl) + ";end";
+}
+
+export function wooriAppHomeLaunchIntent(webUrl: string): string {
+  return buildWooriAppHomeIntent(wooriEventHandoffUrl(webUrl));
+}
+
+/** Issuer-level shortcut: no campaign serial, fallback stays on official home. */
+export function wooriAppHomeShortcutIntent(): string {
+  return buildWooriAppHomeIntent("https://m.wooricard.com/dcmw/main.do");
+}
