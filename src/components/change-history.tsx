@@ -21,6 +21,7 @@ export function ChangeHistory({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState("");
   const [hasOlder, setHasOlder] = useState(Boolean(loadOlderChanges));
   // Without a lazy loader (for example on the pharma screen), props stay authoritative.
   const currentChanges = loadChanges ? visibleChanges : changes;
@@ -49,7 +50,7 @@ export function ChangeHistory({
   async function loadOlder() {
     if (!loadOlderChanges || loadingOlder || !hasOlder || !visibleChanges.length) return;
     setLoadingOlder(true);
-    setError("");
+    setOlderError("");
     try {
       const older = await loadOlderChanges(visibleChanges[visibleChanges.length - 1].id);
       setVisibleChanges((current) => {
@@ -58,7 +59,7 @@ export function ChangeHistory({
       });
       setHasOlder(older.length === 60);
     } catch {
-      setError("이전 변경기록을 불러오지 못했습니다. 다시 시도해 주세요.");
+      setOlderError("이전 변경기록을 불러오지 못했습니다. 다시 시도해 주세요.");
     } finally {
       setLoadingOlder(false);
     }
@@ -105,6 +106,7 @@ export function ChangeHistory({
                 </li>
               ))}
             </ul>
+            {olderError ? <p role="alert" className="border-t border-line px-3 py-2 text-xs text-accent">{olderError}</p> : null}
             {loadOlderChanges && hasOlder ? (
               <button type="button" disabled={loadingOlder}
                 onClick={() => void loadOlder()}
