@@ -4,15 +4,33 @@
  * `mode: "page"` (응모) falls back to the exact web page.
  * Desktop always opens the web page.
  */
+/** Android Chrome intent targeted to a verified native app URI scheme.
+ * Never pass unverified campaign parameters to an app's payment scheme.
+ */
+export function appSchemeIntent(scheme: string, androidPackage: string, fallbackUrl: string): string {
+  if (!/^[a-z][a-z0-9+.-]*$/i.test(scheme) ||
+      !/^[a-z][a-z0-9_.]*$/i.test(androidPackage)) {
+    throw new Error("Invalid app scheme or package");
+  }
+  return `intent://#Intent;scheme=${scheme};package=${androidPackage};S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
+}
+
 export function openApply(
   webUrl: string,
   androidPackage?: string,
   mode: "page" | "app" = "page",
   iosAppId?: string,
+  appScheme?: string,
 ): void {
   const android = /Android/i.test(navigator.userAgent);
   if (android && androidPackage) {
     const play = `https://play.google.com/store/apps/details?id=${encodeURIComponent(androidPackage)}`;
+    // The Woori Card desktop website is NOT the verified app launch URI.
+    // Prefer the issuer's published app scheme when one is known.
+    if (mode === "app" && appScheme) {
+      window.location.href = appSchemeIntent(appScheme, androidPackage, play);
+      return;
+    }
     try {
       const url = new URL(webUrl);
       const fallback = encodeURIComponent(mode === "app" ? play : webUrl);
@@ -44,7 +62,7 @@ export function openApply(
         },
         { once: true },
       );
-      window.location.assign(webUrl);
+      window.location.assign(appScheme ? `${appScheme}://` : webUrl);
       return;
     }
     window.location.assign(webUrl);
