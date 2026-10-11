@@ -42,7 +42,7 @@ export async function appendChanges(
 export async function recentChanges(domain: ChangeDomain, before?: string): Promise<ChangeRecord[]> {
   // Numeric primary key: do not sort by the SELECT alias (id::text as id).
   // Sorting that alias alphabetically placed 99 ahead of 560 and hid newer updates.
-  if (before !== undefined && !/^[1-9]\\d{0,17}$/.test(before)) {
+  if (before !== undefined && !/^[1-9]\d{0,17}$/.test(before)) {
     throw new Error("Invalid change history cursor");
   }
   const sql = await getSql();
