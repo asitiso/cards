@@ -60,13 +60,13 @@ export function PharmaScreen({
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
       <header className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <button type="button" onClick={onFinance} className="shrink-0 text-2xl font-medium tracking-tight text-muted">
+        <div className="flex min-w-0 items-center gap-1">
+          <button type="button" onClick={onFinance} className="shrink-0 text-xl sm:text-2xl font-medium tracking-tight text-muted">
             ㅇㅁㅁㅇ
           </button>
           <button type="button" onClick={onIpo}
-            className="shrink-0 text-2xl font-medium tracking-tight text-muted">ㄱㅁ</button>
-          <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅈㅇㅅ</h1>
+            className="shrink-0 text-xl sm:text-2xl font-medium tracking-tight text-muted">ㄱㅁ</button>
+          <h1 className="shrink-0 text-xl sm:text-2xl font-semibold tracking-tight">ㅈㅇㅅ</h1>
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 truncate text-right text-[11px] tabular-nums leading-tight text-muted sm:text-xs">
