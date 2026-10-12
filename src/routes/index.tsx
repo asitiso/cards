@@ -6,12 +6,17 @@ import { openApply } from "@/lib/events/open-apply";
 import { eventWebDestination, WOORI_MOBILE_EVENTS_URL } from "@/lib/events/event-navigation";
 import { ISSUERS, MARKETS, issuerMeta, type Board, type EntryEvent, type IssuerId, type Market } from "@/lib/events/types";
 import type { PharmaBoard } from "@/lib/pharma/types";
+import type { IpoBoard } from "@/lib/ipo/types";
+import { getIpoBoard } from "@/lib/ipo/board.functions";
 import { ChangeHistory } from "@/components/change-history";
 import { getPharmaBoard } from "@/lib/pharma/board.functions";
 
 // The first paint must never wait for a tab that is not visible.
 const PharmaScreen = lazy(() =>
   import("@/components/pharma-screen").then((module) => ({ default: module.PharmaScreen })),
+);
+const IpoScreen = lazy(() =>
+  import("@/components/ipo-screen").then((module) => ({ default: module.IpoScreen })),
 );
 
 export const Route = createFileRoute("/")({
@@ -22,7 +27,10 @@ export const Route = createFileRoute("/")({
 function Home() {
   const data = Route.useLoaderData();
   const [board, setBoard] = useState<Board>(data.board);
-  const [desk, setDesk] = useState<"finance" | "pharma">("finance");
+  const [desk, setDesk] = useState<"finance" | "ipo" | "pharma">("finance");
+  const [ipo, setIpo] = useState<IpoBoard | null>(null);
+  const [ipoLoading, setIpoLoading] = useState(false);
+  const [ipoError, setIpoError] = useState("");
   const [pharma, setPharma] = useState<PharmaBoard | null>(null);
   const [pharmaLoading, setPharmaLoading] = useState(false);
   const [pharmaError, setPharmaError] = useState("");
@@ -105,11 +113,50 @@ function Home() {
     }
   }
 
+  async function openIpo() {
+    setDesk("ipo");
+    if (ipo || ipoLoading) return;
+    setIpoLoading(true);
+    setIpoError("");
+    try {
+      setIpo(await getIpoBoard());
+    } catch (err) {
+      setIpoError(err instanceof Error ? err.message : "공모주 화면을 불러오지 못했습니다.");
+    } finally {
+      setIpoLoading(false);
+    }
+  }
+
+  if (desk === "ipo") {
+    if (ipo) {
+      return (
+        <Suspense fallback={<p className="p-6 text-sm text-muted">공모주 화면 준비 중입니다.</p>}>
+          <IpoScreen initial={ipo} onFinance={() => setDesk("finance")} onPharma={() => void openPharma()} />
+        </Suspense>
+      );
+    }
+    return (
+      <main className="mx-auto min-h-screen w-full max-w-5xl px-3 py-3 sm:px-6 sm:py-6">
+        <div className="flex items-center gap-3 text-sm font-medium text-muted">
+          <button type="button" onClick={() => setDesk("finance")}>ㅇㅁㅁㅇ</button>
+          <span className="font-semibold text-ink">ㄱㅁ</span>
+          <button type="button" onClick={() => void openPharma()}>ㅈㅇㅅ</button>
+        </div>
+        <p role="status" className="mt-5 text-sm text-muted">
+          {ipoLoading ? "공모주 일정을 조회하는 중입니다." : ipoError || "공모주 화면을 준비하고 있습니다."}
+        </p>
+        {ipoError ? (
+          <button type="button" onClick={() => void openIpo()} className="mt-3 rounded-full border border-line px-4 py-2 text-sm">다시 시도</button>
+        ) : null}
+      </main>
+    );
+  }
+
   if (desk === "pharma") {
     if (pharma) {
       return (
         <Suspense fallback={<p className="p-6 text-sm text-muted">제약사 화면 준비 중입니다.</p>}>
-          <PharmaScreen initial={pharma} onFinance={() => setDesk("finance")} />
+          <PharmaScreen initial={pharma} onFinance={() => setDesk("finance")} onIpo={() => void openIpo()} />
         </Suspense>
       );
     }
@@ -135,6 +182,8 @@ function Home() {
       <header className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅇㅁㅁㅇ</h1>
+          <button type="button" onClick={() => void openIpo()}
+            className="shrink-0 text-2xl font-medium tracking-tight text-muted">ㄱㅁ</button>
           <button
             type="button"
             onClick={() => void openPharma()}
