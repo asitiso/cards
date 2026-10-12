@@ -41,7 +41,7 @@ test("extracts all 7 requested fields and validates math", () => {
     broker: "KB증권",
     minimumShares: 10, depositPercent: 50, minimumDeposit: 39000,
     termsVerified: true, onlineFee: 1500,
-    onlineFeeNote: "KB증권 일반 등급 온라인 청약 기준. 우대·65세 이상·온라인 미배정 시 면제 가능",
+    onlineFeeNote: "패밀리(일반) 온라인 기준 · 우대등급·65세 이상·미배정 시 면제 가능 · 공식 안내표의 기본요금이며 종목·계좌마다 달라질 수 있음",
     feeSourceUrl: "https://www.kbsec.com/go.able?linkcd=m02070012",
   });
 });
@@ -53,7 +53,8 @@ test("does not propagate guessed terms across joint bookrunners", () => {
     sourceUrl: "https://jangjeon.kr/ipo/msbio/",
   });
   assert.equal(shared?.brokerTerms[0].minimumDeposit, null);
-  assert.equal(shared?.brokerTerms[1].onlineFee, null);
+  assert.equal(shared?.brokerTerms[1].minimumDeposit, null);
+  assert.equal(shared?.brokerTerms[1].onlineFee, 2000);
 });
 
 test("rejects mismatched name/period, and bad arithmetic", () => {
@@ -66,7 +67,8 @@ test("rejects mismatched name/period, and bad arithmetic", () => {
   assert.equal(wrong?.brokerTerms[0].minimumDeposit, null);
 });
 
-test("KB-specific fee is not assumed for other issuers", () => {
+test("only source-backed broker fee is shown", () => {
   assert.equal(verifiedOnlineFee("KB증권").onlineFee, 1500);
-  assert.equal(verifiedOnlineFee("대신증권").onlineFee, null);
+  assert.equal(verifiedOnlineFee("대신증권").onlineFee, 2000);
+  assert.equal(verifiedOnlineFee("NH투자증권").onlineFee, null);
 });
