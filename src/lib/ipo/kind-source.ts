@@ -1,5 +1,6 @@
 import { fetchText, seoulToday, stripTags } from "../events/html.ts";
 import type { IpoBoard, IpoItem } from "./types.ts";
+import { IPO38_URL, parse38Ipos } from "./comm38-source.ts";
 
 /**
  * KRX KIND is provided by underwriting brokers. Its public list does not
@@ -86,32 +87,46 @@ export function parseKindIpos(html: string): IpoItem[] {
 
 export async function loadIpoBoard(): Promise<IpoBoard> {
   const today = seoulToday();
-  const base: IpoBoard = {
-    today,
-    collectedAt: new Date().toISOString(),
-    status: "unavailable",
-    sourceUrl: KIND_IPO_URL,
-    message: "공식 공모기업 목록을 확인하지 못했습니다. 아래 원문에서 직접 확인해 주세요.",
-    items: [],
-  };
-  try {
-    const html = await fetchText(KIND_IPO_URL, {}, 8500);
-    const parsed = parseKindIpos(html);
-    // KRX's public table is paginated and may lag revised filings.
-    if (!parsed.length) return {
-      ...base,
-      status: "empty",
-      message: "공개 표에서 청약 정보를 판독하지 못했습니다. 청약이 없다는 뜻은 아닙니다.",
-    };
-    const recentCutoff = new Date(Date.parse(today + "T00:00:00+09:00") - 21 * 86_400_000)
-      .toISOString().slice(0, 10);
-    return {
-      ...base,
-      status: "ok",
-      message: "KRX KIND 공개 목록 기준 · 정정공시·추가 페이지에 따라 누락 또는 지연될 수 있습니다.",
-      items: parsed.filter((item) => item.subscriptionEnd >= recentCutoff),
-    };
-  } catch {
-    return base;
+  const collectedAt = new Date().toISOString();
+  // Both public sources are optional and bounded. This network work happens
+  // only when a user opens the IPO tab; it cannot delay the finance homepage.
+  const results = await Promise.allSettled([
+    fetchText(KIND_IPO_URL, {}, 8000),
+    fetchText(IPO38_URL, {}, 8000),
+  ]);
+  const kind = results[0].status === "fulfilled" ? parseKindIpos(results[0].value) : [];
+  const supplemental = results[1].status === "fulfilled" ? parse38Ipos(results[1].value) : [];
+  const cutoff = new Date(Date.parse(today + "T00:00:00+09:00") - 21 * 86_400_000)
+    .toISOString().slice(0, 10);
+  // Prefer official KIND entries for matching stock + opening date.
+  const merged = new Map<string, IpoItem>();
+  for (const item of supplemental) {
+    if (item.subscriptionEnd >= cutoff) merged.set(item.id, item);
   }
+  for (const item of kind) {
+    if (item.subscriptionEnd < cutoff) continue;
+    const previous = merged.get(item.id);
+    merged.set(item.id, previous ? {
+      ...item,
+      // A public table can leave one of these values blank, retain the
+      // supplementary value but do not infer numbers or fill in unknown lots.
+      offerPrice: item.offerPrice ?? previous.offerPrice,
+      refundDate: item.refundDate || previous.refundDate,
+      listingDate: item.listingDate || previous.listingDate,
+      brokers: [...new Set([...item.brokers, ...previous.brokers])],
+    } : item);
+  }
+  const items = [...merged.values()].sort((a, b) =>
+    a.subscriptionStart.localeCompare(b.subscriptionStart) || a.name.localeCompare(b.name, "ko"),
+  );
+  const status: IpoBoard["status"] = items.length ? "ok"
+    : results.every((result) => result.status === "rejected") ? "unavailable" : "empty";
+  const message = items.length
+    ? "공개 자료 조회 " + items.length + "건 (KRX KIND " + kind.length +
+      "건, 38커뮤니케이션 " + supplemental.length +
+      "건). 공식 원문을 우선하며 공개 자료 미수집·페이지별 누락 및 정정 가능성이 있습니다."
+    : status === "unavailable"
+      ? "공개 청약자료 서버에 연결할 수 없습니다. 공식 원문에서 직접 확인하세요."
+      : "공개 일정표에서 청약 항목을 판독하지 못했습니다. 일정이 없다는 뜻은 아닙니다.";
+  return { today, collectedAt, status, sourceUrl: KIND_IPO_URL, message, items };
 }
