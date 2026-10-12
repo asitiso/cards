@@ -51,6 +51,26 @@ const OFFICIAL: Record<string, PublishedIpoFee> = {
     url: "https://m.eugenefn.com/no20r.do?msgId=521104&pageNo=&topFlag=0",
     note: "공개 청약 안내의 온라인 일반 기준 · 신규·우수 고객 면제 가능",
   },
+  "IBK투자증권": {
+    amount: 1500,
+    url: "https://m.ibks.com/ikd/IKD040101.do",
+    note: "일반 온라인/ARS 기준 · 우대고객 면제",
+  },
+  "한화투자증권": {
+    amount: 2000,
+    url: "https://www.hanwhawm.com/static/center/info/CS144_1t.htm",
+    note: "GOLD/FAMILY 일반 온라인 기준 · VIP 이상 면제 · 미배정 면제",
+  },
+  "iM증권": {
+    amount: 2000,
+    url: "https://www.imfnsec.com/mobile/bank/bank0501.jsp",
+    note: "일반 온라인 기준 · 우대고객 면제",
+  },
+  "우리투자증권": {
+    amount: 2000,
+    url: "https://fundsupermarket.wooriib.com/fmb/FMB1110201/main.do",
+    note: "일반 온라인 기준 · VVIP 등급 면제",
+  },
 };
 
 export function publishedIpoFee(broker: string): {
