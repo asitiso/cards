@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { reloadIpoBoard } from "@/lib/ipo/board.functions";
 import { getIpoTerms } from "@/lib/ipo/terms.functions";
 import { getVerifiedIpoDetail } from "@/lib/ipo/verified-detail.functions";
+import { getIpoDetailsBatch } from "@/lib/ipo/verified-batch.functions";
 import type { VerifiedIpoDetail } from "@/lib/ipo/verified-detail.server";
 import type { IpoTerms } from "@/lib/ipo/terms.server";
 import type { IpoBoard, IpoItem } from "@/lib/ipo/types";
@@ -76,11 +77,51 @@ export function IpoScreen({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [expandedBrokers, setExpandedBrokers] = useState(false);
+  const [detailById, setDetailById] = useState<Record<string, VerifiedIpoDetail>>({});
+  const [batchStatus, setBatchStatus] = useState<"checking" | "ready" | "failed">("checking");
+
+  // Start verification after the schedule has already rendered. Finance home
+  // and the first IPO paint never await external issuer-specific page fetches.
+  useEffect(() => {
+    let active = true;
+    const inputs = board.items.map(item => ({
+      id: item.id, name: item.name, subscriptionStart: item.subscriptionStart,
+      offerPrice: item.offerPrice, brokers: item.brokers,
+    }));
+    setDetailById({});
+    setBatchStatus("checking");
+    if (!inputs.length) {
+      setBatchStatus("ready");
+      return () => { active = false; };
+    }
+    // Chunk large calendars so NO stock is silently omitted by the server
+    // request limit. Show completed chunks without waiting for the slowest.
+    const chunks = Array.from({ length: Math.ceil(inputs.length / 30) },
+      (_, i) => inputs.slice(i * 30, (i + 1) * 30));
+    void Promise.allSettled(chunks.map(chunk =>
+      getIpoDetailsBatch({ data: { items: chunk } }).then(records => {
+        if (active) setDetailById(current => ({
+          ...current,
+          ...Object.fromEntries(records.map(record => [record.id, record.detail])),
+        }));
+      }),
+    )).then(results => {
+      if (!active) return;
+      setBatchStatus(results.some(result => result.status === "fulfilled") ? "ready" : "failed");
+    });
+    return () => { active = false; };
+  }, [board.items]);
 
   const brokers = useMemo(() =>
     [...new Set(board.items.flatMap((item) => item.brokers))].sort((a, b) => a.localeCompare(b, "ko")),
     [board.items],
   );
+  const brokerSlotCount = board.items.reduce((sum, item) => sum + item.brokers.length, 0);
+  const verifiedSlots = board.items.reduce((sum, item) =>
+    sum + (detailById[item.id]?.brokerTerms.filter(term =>
+      term.termsVerified && term.minimumDeposit !== null).length ?? 0), 0);
+  const sourcedFees = board.items.reduce((sum, item) =>
+    sum + (detailById[item.id]?.brokerTerms.filter(term => term.feeSourceUrl).length ?? 0), 0);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return board.items
@@ -184,13 +225,17 @@ export function IpoScreen({
         </button>
       ) : null}
 
-      <p className="mt-2 text-xs text-muted">
-        {filtered.length}건 · 최소 증거금은 증권사 공고 확인 후 확정
+      <p className="mt-2 text-xs leading-relaxed text-muted" role="status">
+        {filtered.length}건 · {batchStatus === "checking" ? "전 종목·증권사 청약조건 병렬 확인 중…" :
+          batchStatus === "failed" ? "자동 검증 연결 실패 · 종목을 누르면 개별 재확인" :
+          "최소 증거금 확인 " + verifiedSlots + "/" + brokerSlotCount +
+          " · 공식 수수료표 확인 " + sourcedFees + "/" + brokerSlotCount}
       </p>
       {filtered.length ? (
         <ul className="mt-1.5 overflow-hidden rounded-2xl border border-line bg-card">
           {filtered.map((item) => (
             <IpoRow key={item.id} item={item} today={board.today}
+              prefetched={detailById[item.id]}
               open={openIds.includes(item.id)}
               onToggle={() => setOpenIds((current) => current.includes(item.id)
                 ? current.filter((id) => id !== item.id) : [...current, item.id])} />
@@ -232,9 +277,10 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
   );
 }
 
-function IpoRow({ item, today, open, onToggle }: {
+function IpoRow({ item, today, prefetched, open, onToggle }: {
   item: IpoItem;
   today: string;
+  prefetched?: VerifiedIpoDetail;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -253,6 +299,15 @@ function IpoRow({ item, today, open, onToggle }: {
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold">{item.name}</span>
             <span className="block truncate text-[11px] text-muted">{item.brokers.join(" · ")} · ~{formatDate(item.subscriptionEnd).slice(5)}</span>
+            {prefetched?.brokerTerms.length === 1 &&
+            prefetched.brokerTerms[0].termsVerified &&
+            prefetched.brokerTerms[0].minimumDeposit !== null ? (
+              <span className="block truncate text-[11px] font-medium text-ink">
+                최소 {money(prefetched.brokerTerms[0].minimumDeposit)}
+                {prefetched.brokerTerms[0].onlineFee !== null
+                  ? " · 수수료 " + money(prefetched.brokerTerms[0].onlineFee) : ""}
+              </span>
+            ) : null}
           </span>
           <span className="shrink-0 text-right">
             <span className="block text-xs font-medium tabular-nums">{item.offerPrice === null ? "미확정" : money(item.offerPrice)}</span>
@@ -262,19 +317,29 @@ function IpoRow({ item, today, open, onToggle }: {
             ? "size-3.5 shrink-0 rotate-180 text-muted" : "size-3.5 shrink-0 text-muted"} />
         </button>
       </div>
-      {open ? <IpoDetails item={item} /> : null}
+      {open ? <IpoDetails item={item} prefetched={prefetched} /> : null}
     </li>
   );
 }
 
-function IpoDetails({ item }: { item: IpoItem }) {
+function IpoDetails({ item, prefetched }: { item: IpoItem; prefetched?: VerifiedIpoDetail }) {
   const [shares, setShares] = useState("10");
   const [percent, setPercent] = useState("50");
   const [terms, setTerms] = useState<IpoTerms | null>(null);
   const [termsPending, setTermsPending] = useState(false);
-  const [verifiedDetail, setVerifiedDetail] = useState<VerifiedIpoDetail | null>(null);
+  const [verifiedDetail, setVerifiedDetail] = useState<VerifiedIpoDetail | null>(prefetched ?? null);
   const [verifiedPending, setVerifiedPending] = useState(true);
   useEffect(() => {
+    if (prefetched) {
+      setVerifiedDetail(prefetched);
+      const single = prefetched.brokerTerms.length === 1 ? prefetched.brokerTerms[0] : null;
+      if (single?.termsVerified && single.minimumShares !== null)
+        setShares(String(single.minimumShares));
+      if (single?.termsVerified && single.depositPercent !== null)
+        setPercent(String(single.depositPercent));
+      setVerifiedPending(false);
+      return;
+    }
     let active = true;
     setVerifiedPending(true);
     getVerifiedIpoDetail({ data: {
@@ -293,7 +358,7 @@ function IpoDetails({ item }: { item: IpoItem }) {
       .catch(() => { /* Failure leaves unavailable information unverified. */ })
       .finally(() => { if (active) setVerifiedPending(false); });
     return () => { active = false; };
-  }, [item.name, item.subscriptionStart, item.offerPrice, item.brokers.join("|")]);
+  }, [item.name, item.subscriptionStart, item.offerPrice, item.brokers.join("|"), prefetched]);
   useEffect(() => {
     if (!item.sourceUrl.startsWith("https://www.38.co.kr/")) return;
     let active = true;
@@ -352,18 +417,36 @@ function IpoDetails({ item }: { item: IpoItem }) {
         <Info label="준비 금액 (일반 기준)" value={totalReady === null
           ? "확인 필요" : money(totalReady) + " (참고)"} />
       </div>
-      {verifiedDetail?.brokerTerms.some(x => x.onlineFee !== null) ? (
-        <div className="mt-2 rounded-lg border border-line bg-card px-3 py-2 text-xs leading-relaxed text-muted">
-          {verifiedDetail.brokerTerms.map(row => (
-            <p key={row.broker}>
-              {row.broker}: {row.onlineFee === null ? "수수료 미확인" : "일반 온라인 " + money(row.onlineFee)}
-              {row.onlineFeeNote ? " · " + row.onlineFeeNote : ""}
-              {row.feeSourceUrl ? (
-                <> · <a href={row.feeSourceUrl} target="_blank" rel="noopener noreferrer" className="underline">증권사 공식 수수료표</a></>
-              ) : null}
-            </p>
-          ))}
-        </div>
+      {verifiedDetail?.brokerTerms.length ? (
+        <section className="mt-3 rounded-xl border border-line bg-card p-3">
+          <p className="text-xs font-semibold">주관사별 청약조건 · 일반 온라인 기준</p>
+          <div className="mt-2 space-y-3">
+            {verifiedDetail.brokerTerms.map(row => (
+              <div key={row.broker} className="border-t border-line pt-2 first:border-t-0 first:pt-0">
+                <p className="text-sm font-semibold">{row.broker}</p>
+                <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-2">
+                  <Info label="최소 청약" value={row.termsVerified && row.minimumShares !== null
+                    ? row.minimumShares + "주" : "종목별 미확인"} />
+                  <Info label="증거금률" value={row.termsVerified && row.depositPercent !== null
+                    ? row.depositPercent + "%" : "종목별 미확인"} />
+                  <Info label="최소 증거금" value={row.termsVerified && row.minimumDeposit !== null
+                    ? money(row.minimumDeposit) : "종목별 미확인"} />
+                  <Info label="일반 온라인 수수료" value={row.onlineFee === null
+                    ? "공식 미확인" : money(row.onlineFee)} />
+                </div>
+                <p className="mt-1 text-xs text-muted">{row.onlineFeeNote}</p>
+                {row.feeSourceUrl ? <a href={row.feeSourceUrl} target="_blank"
+                  rel="noopener noreferrer" className="text-xs underline">
+                    증권사 공식 수수료 원문 <ArrowUpRight className="inline size-3" />
+                </a> : null}
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted">
+            수수료는 고객등급·채널·미배정 여부에 따라 달라집니다.
+            공동 주관 종목은 각 증권사 최소 청약수량을 별도로 확인해야 합니다.
+          </p>
+        </section>
       ) : null}
       <div className="mt-3 rounded-xl border border-line bg-card px-3 py-3">
         <p className="text-xs font-semibold">청약 증거금 계산 <span className="font-normal text-muted">· 참고 계산, 수수료 제외</span></p>

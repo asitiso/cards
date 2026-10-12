@@ -1,4 +1,5 @@
 import { fetchText, stripTags, visibleMarkup } from "../events/html.ts";
+import { publishedIpoFee } from "./broker-fees.ts";
 
 export type BrokerTerms = {
   broker: string;
@@ -24,32 +25,11 @@ export type VerifiedIpoDetail = {
 export const KB_OFFICIAL_IPO_FEES =
   "https://www.kbsec.com/go.able?linkcd=m02070012";
 const JANGJEON_HOME = "https://jangjeon.kr/";
+const JANGJEON_IPO_INDEX = "https://jangjeon.kr/ipo/";
+const JANGJEON_RECORDS = "https://jangjeon.kr/ipo/records/";
 const sourceName = "장전 공모주 상세(보조 자료)";
 
-/**
- * KB Securities' published general online IPO fee is 1,500 KRW for
- * the ordinary (Family) tier. Qualifying grades, seniors, and some
- * zero-allocation online applications can be fee-free. It is not a
- * universal per-application debit.
- * Other brokers remain UNKNOWN until their exact official schedules
- * are verified: do not guess 2,000KRW or assume all brokers are alike.
- */
-export function verifiedOnlineFee(broker: string): {
-  onlineFee: number | null;
-  onlineFeeNote: string;
-  feeSourceUrl: string;
-} {
-  if (broker === "KB증권" || broker === "케이비증권") return {
-    onlineFee: 1500,
-    onlineFeeNote: "KB증권 일반 등급 온라인 청약 기준. 우대·65세 이상·온라인 미배정 시 면제 가능",
-    feeSourceUrl: KB_OFFICIAL_IPO_FEES,
-  };
-  return {
-    onlineFee: null,
-    onlineFeeNote: "증권사별 온라인 청약 수수료 미확인",
-    feeSourceUrl: "",
-  };
-}
+export const verifiedOnlineFee = publishedIpoFee;
 
 function isoDate(year: number, month: number, day: number): string {
   if (year < 2020 || year > 2040 || month < 1 || month > 12) return "";
@@ -72,7 +52,9 @@ export function findIpoDetailUrl(homeHtml: string, name: string): string {
     // Label can include a separate "확정" badge. Never substring-match a
     // different share class or an unrelated stock name.
     if (linkName !== requested &&
-      ![requested + "확정", requested + "변경가능", requested + "예정"].includes(linkName)) continue;
+      ![requested + "확정", requested + "변경가능", requested + "예정",
+        requested + "청약시작", requested + "청약마감", requested + "환불일",
+        requested + "상장일"].includes(linkName)) continue;
     try {
       const u = new URL(link[1].replace(/&amp;/g, "&"), JANGJEON_HOME);
       if (u.protocol === "https:" && u.hostname === "jangjeon.kr" &&
@@ -152,37 +134,133 @@ export function parseVerifiedDetail(html: string, args: {
   };
 }
 
-/**
- * Called only for expanded cards: homepage remains untouched; on first
- * selection, the public index provides an exact issuer URL.
- */
-export async function fetchVerifiedIpoDetail(args: {
+export type IpoDetailRequest = {
   name: string;
   subscriptionStart: string;
   offerPrice: number | null;
   brokers: string[];
-}): Promise<VerifiedIpoDetail> {
-  const empty: VerifiedIpoDetail = {
+};
+
+// Soft cache only: speeds up repeated tab visits within the same worker,
+// but does not claim durability across Vercel function restarts.
+const INDEX_TTL = 6 * 60_000;
+const ITEM_TTL = 3 * 60_000;
+let cachedIndex: { html: string; expires: number } | null = null;
+let indexInflight: Promise<string> | null = null;
+const itemCache = new Map<string, { detail: VerifiedIpoDetail; expires: number }>();
+const itemInflight = new Map<string, Promise<VerifiedIpoDetail>>();
+
+function safeRequest(args: IpoDetailRequest): boolean {
+  return Boolean(args.name && args.name.length <= 80 &&
+    /^20\d{2}-\d{2}-\d{2}$/.test(args.subscriptionStart) &&
+    args.brokers.length > 0 && args.brokers.length <= 8 &&
+    args.brokers.every(x => x.length > 0 && x.length < 45) &&
+    (args.offerPrice === null || (Number.isSafeInteger(args.offerPrice) &&
+      args.offerPrice >= 100 && args.offerPrice < 10000000)));
+}
+
+function blankDetail(args: IpoDetailRequest): VerifiedIpoDetail {
+  return {
     refundDate: "", listingDate: "", sourceUrl: "", sourceLabel: sourceName,
     checkedAt: new Date().toISOString(),
     brokerTerms: args.brokers.slice(0, 8).map(broker => ({
       broker, minimumShares: null, depositPercent: null, minimumDeposit: null,
       termsVerified: false, ...verifiedOnlineFee(broker),
     })),
-    note: "종목별 최소 청약주수·증거금률과 환불일은 아직 검증되지 않았습니다.",
+    note: "공개 종목별 청약수량·증거금률을 확인하지 못했습니다. 주관사별 공고를 확인하세요.",
   };
-  if (!args.name || args.name.length > 80 ||
-      !/^20\d{2}-\d{2}-\d{2}$/.test(args.subscriptionStart) ||
-      args.brokers.length > 8 || !args.brokers.every(x => x.length > 0 && x.length < 45)) return empty;
+}
+
+async function getIpoIndex(): Promise<string> {
+  if (cachedIndex && cachedIndex.expires > Date.now()) return cachedIndex.html;
+  if (indexInflight) return indexInflight;
+  indexInflight = (async () => {
+    const results = await Promise.allSettled(
+      [JANGJEON_IPO_INDEX, JANGJEON_HOME, JANGJEON_RECORDS]
+        .map(url => fetchText(url, {}, 4500)),
+    );
+    const pages = results.flatMap(result => result.status === "fulfilled"
+      ? [result.value] : []);
+    if (!pages.length) throw Error("All IPO index sources unavailable");
+    const html = pages.join("\n");
+    cachedIndex = { html, expires: Date.now() + INDEX_TTL };
+    return html;
+  })();
+  try { return await indexInflight; }
+  finally { indexInflight = null; }
+}
+
+async function readItem(args: IpoDetailRequest, indexHtml: string): Promise<VerifiedIpoDetail> {
+  const empty = blankDetail(args);
+  const url = findIpoDetailUrl(indexHtml, args.name);
+  if (!url) return empty;
   try {
-    const home = await fetchText(JANGJEON_HOME, {}, 5000);
-    const url = findIpoDetailUrl(home, args.name);
-    if (!url) return empty;
-    const html = await fetchText(url, {}, 6500);
-    const parsed = parseVerifiedDetail(html, { ...args, sourceUrl: url });
-    if (!parsed) return empty;
-    return parsed;
+    const html = await fetchText(url, {}, 4800);
+    return parseVerifiedDetail(html, { ...args, sourceUrl: url }) ?? empty;
   } catch {
     return empty;
   }
+}
+
+function itemKey(args: IpoDetailRequest): string {
+  return [normalized(args.name), args.subscriptionStart, args.offerPrice ?? "?",
+    args.brokers.slice().sort().join(",")].join("|");
+}
+
+async function memoItem(args: IpoDetailRequest, indexHtml: string): Promise<VerifiedIpoDetail> {
+  const key = itemKey(args);
+  const old = itemCache.get(key);
+  if (old && old.expires > Date.now()) return old.detail;
+  const inflight = itemInflight.get(key);
+  if (inflight) return inflight;
+  const work = readItem(args, indexHtml).then(detail => {
+    itemCache.set(key, {
+      detail, expires: Date.now() + (detail.sourceUrl ? ITEM_TTL : 75_000),
+    });
+    if (itemCache.size > 200) {
+      for (const [id, entry] of itemCache) {
+        if (entry.expires <= Date.now()) itemCache.delete(id);
+      }
+      if (itemCache.size > 200) itemCache.delete(itemCache.keys().next().value!);
+    }
+    return detail;
+  });
+  itemInflight.set(key, work);
+  try { return await work; }
+  finally { itemInflight.delete(key); }
+}
+
+/** Single-item lookup remains available for a card expanded before bulk fetch. */
+export async function fetchVerifiedIpoDetail(args: IpoDetailRequest): Promise<VerifiedIpoDetail> {
+  if (!safeRequest(args)) return blankDetail(args);
+  try { return await memoItem(args, await getIpoIndex()); }
+  catch { return blankDetail(args); }
+}
+
+/**
+ * Perform one shared index download followed by a bounded parallel scan of
+ * ALL displayed offerings. Preserves original order, has no effect on the
+ * finance homepage, and returns unavailable fields as null rather than fake
+ * "confirmed" values. Entries are scoped to the currently requested list.
+ */
+export async function fetchIpoDetailsBatch(
+  items: Array<{ id: string } & IpoDetailRequest>,
+): Promise<Array<{ id: string; detail: VerifiedIpoDetail }>> {
+  const workItems = items.slice(0, 35);
+  let index = "";
+  try { index = await getIpoIndex(); } catch { /* fees can still be shown */ }
+  const output: Array<{ id: string; detail: VerifiedIpoDetail }> = new Array(workItems.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(6, workItems.length) }, async () => {
+    while (cursor < workItems.length) {
+      const i = cursor++;
+      const item = workItems[i];
+      output[i] = {
+        id: item.id,
+        detail: index && safeRequest(item)
+          ? await memoItem(item, index) : blankDetail(item),
+      };
+    }
+  }));
+  return output;
 }
