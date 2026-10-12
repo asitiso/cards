@@ -209,7 +209,7 @@ export function IpoScreen({
         </p>
         <a href={board.sourceUrl} target="_blank" rel="noopener noreferrer"
           className="mt-3 inline-flex h-9 items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink">
-          KRX KIND 공식 공모기업 목록 <ArrowUpRight className="size-4" />
+          KRX KIND 공모기업 공식 원문 <ArrowUpRight className="size-4" />
         </a>
         <p className="mt-2 text-xs leading-relaxed text-muted">
           이 화면은 투자 권유가 아닌 일정 확인용입니다. KIND 공개 목록은 페이지별로 제공되며 일정 변경이나 누락 가능성이 있습니다. 최종 청약조건은 주관사의 투자설명서·청약 공고가 우선합니다.
@@ -253,8 +253,8 @@ function IpoRow({ item, today, open, onToggle }: {
             <span className="block truncate text-[11px] text-muted">{item.brokers.join(" · ")} · ~{formatDate(item.subscriptionEnd).slice(5)}</span>
           </span>
           <span className="shrink-0 text-right">
-            <span className="block text-xs font-medium tabular-nums">{money(item.offerPrice)}</span>
-            <span className="block text-[10px] text-muted">공모가</span>
+            <span className="block text-xs font-medium tabular-nums">{item.offerPrice === null ? "미확정" : money(item.offerPrice)}</span>
+            <span className="block text-[10px] text-muted">{item.offerPrice === null && item.indicativePriceRange ? "희망가 별도" : "공모가"}</span>
           </span>
           <ChevronDown className={open
             ? "size-3.5 shrink-0 rotate-180 text-muted" : "size-3.5 shrink-0 text-muted"} />
@@ -299,6 +299,7 @@ function IpoDetails({ item }: { item: IpoItem }) {
       <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
         <Info label="청약 기간" value={formatDate(item.subscriptionStart) + " ~ " + formatDate(item.subscriptionEnd)} />
         <Info label="확정 공모가" value={money(item.offerPrice)} />
+        {item.indicativePriceRange ? <Info label="희망 공모가 범위" value={item.indicativePriceRange} /> : null}
         <Info label="환불·납입일" value={formatDate(item.refundDate || terms?.refundDate || "")} />
         <Info label="상장 예정일" value={formatDate(item.listingDate || terms?.listingDate || "")} />
         <Info label="최소 청약주수" value={minimumShares === null
