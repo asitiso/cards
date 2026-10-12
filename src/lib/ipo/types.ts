@@ -5,6 +5,8 @@ export type IpoItem = {
   subscriptionStart: string;
   subscriptionEnd: string;
   offerPrice: number | null;
+  /** Only an indicative price band, never use as the confirmed issue price. */
+  indicativePriceRange?: string;
   refundDate: string;
   listingDate: string;
   brokers: string[];
