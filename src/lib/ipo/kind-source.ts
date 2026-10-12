@@ -89,63 +89,72 @@ export function parseKindIpos(html: string): IpoItem[] {
 export async function loadIpoBoard(): Promise<IpoBoard> {
   const today = seoulToday();
   const collectedAt = new Date().toISOString();
-  // Three independent public sources; loading the finance home page never
-  // fetches IPOs. A source must yield real parsed rows to count as usable.
-  const endpoints = [
-    { label: "공모주로그", url: SONNIM_SCHEDULE_URL },
+  const cutoff = new Date(Date.parse(today + "T00:00:00+09:00") - 21 * 86_400_000)
+    .toISOString().slice(0, 10);
+  const recent = (items: IpoItem[]) => items.filter(item => item.subscriptionEnd >= cutoff)
+    .sort((a, b) => a.subscriptionStart.localeCompare(b.subscriptionStart) ||
+      a.name.localeCompare(b.name, "ko"));
+
+  // Fast path. The public schedule includes confirmed and upcoming IPOs,
+  // and is substantially faster than waiting for blocked legacy sources.
+  // Neither the homepage nor other finance collections depend on this request.
+  let primaryMessage = "공모주로그 접속 실패";
+  try {
+    const html = await fetchText(SONNIM_SCHEDULE_URL, {}, 4500);
+    const parsed = parseSonnimIpos(html, today);
+    const items = recent(parsed);
+    primaryMessage = parsed.length > 0
+      ? "공모주로그 " + items.length + "건 (전체 판독 " + parsed.length + "건)"
+      : "공모주로그 본문 판독 0건";
+    if (items.length > 0) {
+      return {
+        today, collectedAt, status: "ok",
+        sourceUrl: KIND_IPO_URL,
+        message: "공개 청약 일정 " + items.length + "건 · " + primaryMessage +
+          ". 신규·정정 공시 지연 가능. 청약 전 주관사 공고를 확인하세요.",
+        items,
+      };
+    }
+  } catch {
+    // Move to backup sources rather than returning a false empty state.
+  }
+
+  // Fallback only: do not wait for two often-unavailable HTML sources on
+  // every ordinary IPO tab open. Keep their original parser tests intact.
+  const sources = [
     { label: "KRX KIND", url: KIND_IPO_URL },
     { label: "38커뮤니케이션", url: IPO38_URL },
   ];
-  const requests = await Promise.allSettled(endpoints.map((source) =>
-    fetchText(source.url, {}, 7000),
+  const responses = await Promise.allSettled(sources.map(source =>
+    fetchText(source.url, {}, 6500),
   ));
-  const sonnim = requests[0].status === "fulfilled"
-    ? parseSonnimIpos(requests[0].value, today) : [];
-  const kind = requests[1].status === "fulfilled"
-    ? parseKindIpos(requests[1].value) : [];
-  const thirdParty = requests[2].status === "fulfilled"
-    ? parse38Ipos(requests[2].value) : [];
-
-  const cutoff = new Date(Date.parse(today + "T00:00:00+09:00") - 21 * 86_400_000)
-    .toISOString().slice(0, 10);
-  const byName = new Map<string, IpoItem>();
-  const keyOf = (item: IpoItem) => item.name.replace(/[\s()（）·-]/g, "");
-  // Recent/current entries from the updated public schedule take precedence
-  // over stale records from older supplementary schedules.
-  for (const source of [sonnim, kind, thirdParty]) {
-    for (const item of source) {
-      if (item.subscriptionEnd < cutoff) continue;
-      const key = keyOf(item);
-      const prior = byName.get(key);
-      if (!prior) {
-        byName.set(key, item);
-      } else if (prior.subscriptionStart === item.subscriptionStart) {
-        // Fill missing dates only when the two sources agree on the offering period.
-        byName.set(key, {
-          ...prior,
-          listingDate: prior.listingDate || item.listingDate,
-          refundDate: prior.refundDate || item.refundDate,
-          brokers: [...new Set([...prior.brokers, ...item.brokers])],
-        });
-      }
-    }
+  const kind = responses[0].status === "fulfilled"
+    ? recent(parseKindIpos(responses[0].value)) : [];
+  const backup = responses[1].status === "fulfilled"
+    ? recent(parse38Ipos(responses[1].value)) : [];
+  const merged = new Map<string, IpoItem>();
+  for (const item of [...kind, ...backup]) {
+    const key = item.name.replace(/[\s()（）·-]/g, "");
+    const prior = merged.get(key);
+    if (!prior) merged.set(key, item);
+    else if (prior.subscriptionStart === item.subscriptionStart) merged.set(key, {
+      ...prior,
+      refundDate: prior.refundDate || item.refundDate,
+      listingDate: prior.listingDate || item.listingDate,
+      brokers: [...new Set([...prior.brokers, ...item.brokers])],
+    });
   }
-  const items = [...byName.values()].sort((a, b) =>
-    a.subscriptionStart.localeCompare(b.subscriptionStart) ||
-    a.name.localeCompare(b.name, "ko"),
-  );
-  const tally = [sonnim.length, kind.length, thirdParty.length];
-  const report = endpoints.map((source, index) => {
-    const status = requests[index].status === "rejected" ? "접속 실패"
-      : tally[index] > 0 ? tally[index] + "건 판독" : "본문 판독 0건";
-    return source.label + " " + status;
-  }).join(" · ");
-  const status: IpoBoard["status"] = items.length > 0 ? "ok"
-    : requests.every((r) => r.status === "rejected") ? "unavailable" : "empty";
+  const items = recent([...merged.values()]);
+  const sourceReport = sources.map((source, i) =>
+    source.label + " " + (responses[i].status === "rejected"
+      ? "접속 실패" : (i === 0 ? kind.length : backup.length) + "건 판독"),
+  ).join(" · ");
+  const status: IpoBoard["status"] = items.length
+    ? "ok" : responses.every(r => r.status === "rejected") ? "unavailable" : "empty";
   const message = status === "ok"
-    ? "공개 일정 " + items.length + "건 · " + report +
-      ". 예정 종목·공모가는 변경될 수 있으며 최종 청약 공고가 우선합니다."
-    : "공모주 자동 수집에 실패했습니다 (" + report +
-      "). 0건은 청약 종목이 없다는 뜻이 아닙니다. 공식 일정표를 확인하세요.";
+    ? "대체 공개 자료 " + items.length + "건 · " + primaryMessage + " · " + sourceReport +
+      ". 최신 일정은 주관사 공고를 확인하세요."
+    : "공모주 자동 수집 실패: " + primaryMessage + " · " + sourceReport +
+      ". 0건이 실제 청약 종목 0건이라는 뜻은 아닙니다.";
   return { today, collectedAt, status, sourceUrl: KIND_IPO_URL, message, items };
 }
