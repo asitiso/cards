@@ -7,9 +7,10 @@ test("reads only retail investor minimum and margin from a matching IPO detail",
     "우리사주조합 청약증거금율 : 100% " +
     "기관투자자등 청약한도 100,000 주 " +
     "일반청약자 500,000 주 청약증거금율 : 50% 청약 최고한도 : 3000 주 최저 : 10 주 " +
-    "IR일정 기관투자자</body></html>";
+    "환불일 2026.10.15 상장일 2026.10.22 IR일정 기관투자자</body></html>";
   assert.deepEqual(parse38Terms(html, "빅웨이브로보틱스"), {
     minimumShares: 10, depositPercent: 50, verified: true,
+    refundDate: "2026-10-15", listingDate: "2026-10-22",
   });
 });
 
