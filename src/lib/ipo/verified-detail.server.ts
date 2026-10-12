@@ -91,9 +91,17 @@ function findDate(text: string, label: "환불" | "상장", subscriptionYear: nu
   if (matched) return isoDate(Number(matched[1]), Number(matched[2]), Number(matched[3]));
   const korean = new RegExp(label + "(?:일| 예정일|·납입일)?\\s*[:：]?\\s*(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일");
   const m = text.match(korean);
-  if (!m) return "";
+  if (!m) {
+    // Live filings also say "증거금은 YYYY.MM.DD에 환불됩니다" or
+    // "상장 예정일은 YYYY.MM.DD입니다".
+    const narrative = label === "환불"
+      ? /(?:증거금|잔여금)(?:은|이)?\s*(20\d{2})\s*[.\/-]\s*(\d{1,2})\s*[.\/-]\s*(\d{1,2})에\s*환불/
+      : /상장\s*(?:예정)?일(?:은|이)?\s*(20\d{2})\s*[.\/-]\s*(\d{1,2})\s*[.\/-]\s*(\d{1,2})/;
+    const found = text.match(narrative);
+    return found ? isoDate(Number(found[1]), Number(found[2]), Number(found[3])) : "";
+  }
   const month = Number(m[1]), day = Number(m[2]);
-  const year = month === 1 && subscriptionYear % 100 === 12 ? subscriptionYear + 1 : subscriptionYear;
+  const year = subscriptionYear;
   return isoDate(year, month, day);
 }
 
