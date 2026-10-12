@@ -7,9 +7,11 @@ import { ChangeHistory } from "@/components/change-history";
 export function PharmaScreen({
   initial,
   onFinance,
+  onIpo,
 }: {
   initial: PharmaBoard;
   onFinance: () => void;
+  onIpo: () => void;
 }) {
   const [board, setBoard] = useState(initial);
   const [company, setCompany] = useState<string>("all");
@@ -62,6 +64,8 @@ export function PharmaScreen({
           <button type="button" onClick={onFinance} className="shrink-0 text-2xl font-medium tracking-tight text-muted">
             ㅇㅁㅁㅇ
           </button>
+          <button type="button" onClick={onIpo}
+            className="shrink-0 text-2xl font-medium tracking-tight text-muted">ㄱㅁ</button>
           <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅈㅇㅅ</h1>
         </div>
         <div className="flex min-w-0 items-center gap-2">
