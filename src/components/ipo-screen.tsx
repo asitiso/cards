@@ -94,13 +94,21 @@ export function IpoScreen({
       setBatchStatus("ready");
       return () => { active = false; };
     }
-    getIpoDetailsBatch({ data: { items: inputs } })
-      .then(records => {
-        if (!active) return;
-        setDetailById(Object.fromEntries(records.map(record => [record.id, record.detail])));
-        setBatchStatus("ready");
-      })
-      .catch(() => { if (active) setBatchStatus("failed"); });
+    // Chunk large calendars so NO stock is silently omitted by the server
+    // request limit. Show completed chunks without waiting for the slowest.
+    const chunks = Array.from({ length: Math.ceil(inputs.length / 30) },
+      (_, i) => inputs.slice(i * 30, (i + 1) * 30));
+    void Promise.allSettled(chunks.map(chunk =>
+      getIpoDetailsBatch({ data: { items: chunk } }).then(records => {
+        if (active) setDetailById(current => ({
+          ...current,
+          ...Object.fromEntries(records.map(record => [record.id, record.detail])),
+        }));
+      }),
+    )).then(results => {
+      if (!active) return;
+      setBatchStatus(results.some(result => result.status === "fulfilled") ? "ready" : "failed");
+    });
     return () => { active = false; };
   }, [board.items]);
 
