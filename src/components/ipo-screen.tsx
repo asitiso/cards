@@ -1,6 +1,8 @@
 import { ArrowUpRight, ChevronDown, RefreshCw, Search, X } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { reloadIpoBoard } from "@/lib/ipo/board.functions";
+import { getIpoTerms } from "@/lib/ipo/terms.functions";
+import type { IpoTerms } from "@/lib/ipo/terms.server";
 import type { IpoBoard, IpoItem } from "@/lib/ipo/types";
 
 type Scope = "all" | "open" | "upcoming" | "ended";
@@ -266,6 +268,27 @@ function IpoRow({ item, today, open, onToggle }: {
 function IpoDetails({ item }: { item: IpoItem }) {
   const [shares, setShares] = useState("10");
   const [percent, setPercent] = useState("50");
+  const [terms, setTerms] = useState<IpoTerms | null>(null);
+  const [termsPending, setTermsPending] = useState(false);
+  useEffect(() => {
+    if (!item.sourceUrl.startsWith("https://www.38.co.kr/")) return;
+    let active = true;
+    setTermsPending(true);
+    getIpoTerms({ data: { url: item.sourceUrl, name: item.name } })
+      .then((result) => {
+        if (!active) return;
+        setTerms(result);
+        if (result.minimumShares !== null) setShares(String(result.minimumShares));
+        if (result.depositPercent !== null) setPercent(String(result.depositPercent));
+      })
+      .catch(() => { /* Terms are best-effort; unknown remains unknown. */ })
+      .finally(() => { if (active) setTermsPending(false); });
+    return () => { active = false; };
+  }, [item.name, item.sourceUrl]);
+  const minimumShares = item.minimumShares ?? terms?.minimumShares ?? null;
+  const depositPercent = item.depositPercent ?? terms?.depositPercent ?? null;
+  const actualMinimum = minimumShares !== null && depositPercent !== null && item.offerPrice !== null
+    ? Math.ceil(item.offerPrice * minimumShares * depositPercent / 100) : null;
   const amount = item.offerPrice !== null &&
     Number(shares) > 0 && Number.isInteger(Number(shares)) && Number(shares) <= 10000000 &&
     Number(percent) > 0 && Number(percent) <= 100
@@ -278,13 +301,18 @@ function IpoDetails({ item }: { item: IpoItem }) {
         <Info label="확정 공모가" value={money(item.offerPrice)} />
         <Info label="환불·납입일" value={formatDate(item.refundDate)} />
         <Info label="상장 예정일" value={formatDate(item.listingDate)} />
-        <Info label="최소 청약주수" value={item.minimumShares === null ? "증권사별 확인 필요" : item.minimumShares + "주"} />
-        <Info label="최소 증거금" value={item.offerPrice !== null && item.minimumShares !== null && item.depositPercent !== null
-          ? money(Math.ceil(item.offerPrice * item.minimumShares * item.depositPercent / 100))
-          : "증권사별 확인 필요"} />
+        <Info label="최소 청약주수" value={minimumShares === null
+          ? termsPending ? "조건 확인 중" : "증권사별 확인 필요"
+          : minimumShares + "주 (참고)"} />
+        <Info label="청약 증거금률" value={depositPercent === null
+          ? "증권사별 확인 필요" : depositPercent + "% (참고)"} />
+        <Info label="최소 필요 증거금" value={actualMinimum !== null
+          ? money(actualMinimum) + " (참고)"
+          : termsPending ? "조건 확인 중" : "증권사별 확인 필요"} />
+        <Info label="청약 수수료" value="증권사별 확인 필요" />
       </div>
       <div className="mt-3 rounded-xl border border-line bg-card px-3 py-3">
-        <p className="text-xs font-semibold">증거금 계산 예시 <span className="font-normal text-muted">· 확정 최소금액 아님</span></p>
+        <p className="text-xs font-semibold">청약 증거금 계산 <span className="font-normal text-muted">· 참고 계산, 수수료 제외</span></p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <label className="text-xs text-muted">청약 주수
             <input type="number" min="1" step="1" max="10000000" inputMode="numeric"
@@ -300,7 +328,9 @@ function IpoDetails({ item }: { item: IpoItem }) {
         <p className="mt-2 text-sm font-semibold tabular-nums">
           계산 예시 {money(amount)}
         </p>
-        <p className="mt-1 text-xs leading-relaxed text-muted">기본 입력값 10주·50%는 단순 계산 예시입니다. 실제 최소 청약주수·증거금률·수수료는 주관사 청약 공고에서 확인하세요.</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted">{minimumShares !== null || depositPercent !== null
+          ? "38커뮤니케이션 상세표에서 확인된 조건을 입력했습니다. 최종 적용 조건은 주관사 공식 공고에서 확인하세요."
+          : "기본 입력값 10주·50%는 단순 계산 예시이며 확정 최소금액이 아닙니다."} 계좌 개설 시한·우대 청약한도·수수료는 증권사별 확인이 필요합니다.</p>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
         주관사: {item.brokers.join(", ")} · {item.market || "시장 확인 필요"} · 자료: {item.sourceLabel}
@@ -314,7 +344,7 @@ function IpoDetails({ item }: { item: IpoItem }) {
         ) : null)}
         <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer"
           className="inline-flex h-8 items-center gap-1 rounded-full bg-accent px-3 text-xs font-medium text-accent-ink">
-          공모 원문 <ArrowUpRight className="size-3" />
+          {item.sourceLabel.startsWith("38") ? "청약 상세표" : "공식 공모 목록"} <ArrowUpRight className="size-3" />
         </a>
       </div>
     </div>
