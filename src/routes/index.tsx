@@ -180,14 +180,14 @@ function Home() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-6">
       <header className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="shrink-0 text-2xl font-semibold tracking-tight">ㅇㅁㅁㅇ</h1>
+        <div className="flex min-w-0 items-center gap-1">
+          <h1 className="shrink-0 text-xl sm:text-2xl font-semibold tracking-tight">ㅇㅁㅁㅇ</h1>
           <button type="button" onClick={() => void openIpo()}
-            className="shrink-0 text-2xl font-medium tracking-tight text-muted">ㄱㅁ</button>
+            className="shrink-0 text-xl sm:text-2xl font-medium tracking-tight text-muted">ㄱㅁ</button>
           <button
             type="button"
             onClick={() => void openPharma()}
-            className="shrink-0 text-2xl font-medium tracking-tight text-muted"
+            className="shrink-0 text-xl sm:text-2xl font-medium tracking-tight text-muted"
           >
             ㅈㅇㅅ
           </button>
