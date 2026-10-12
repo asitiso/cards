@@ -1,5 +1,5 @@
 import { ArrowUpRight, ChevronDown, RefreshCw, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { reloadIpoBoard } from "@/lib/ipo/board.functions";
 import type { IpoBoard, IpoItem } from "@/lib/ipo/types";
 
@@ -217,7 +217,7 @@ export function IpoScreen({
   );
 }
 
-function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={active}
       className={active
