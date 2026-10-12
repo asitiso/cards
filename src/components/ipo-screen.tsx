@@ -2,6 +2,8 @@ import { ArrowUpRight, ChevronDown, RefreshCw, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { reloadIpoBoard } from "@/lib/ipo/board.functions";
 import { getIpoTerms } from "@/lib/ipo/terms.functions";
+import { getVerifiedIpoDetail } from "@/lib/ipo/verified-detail.functions";
+import type { VerifiedIpoDetail } from "@/lib/ipo/verified-detail.server";
 import type { IpoTerms } from "@/lib/ipo/terms.server";
 import type { IpoBoard, IpoItem } from "@/lib/ipo/types";
 
@@ -270,6 +272,28 @@ function IpoDetails({ item }: { item: IpoItem }) {
   const [percent, setPercent] = useState("50");
   const [terms, setTerms] = useState<IpoTerms | null>(null);
   const [termsPending, setTermsPending] = useState(false);
+  const [verifiedDetail, setVerifiedDetail] = useState<VerifiedIpoDetail | null>(null);
+  const [verifiedPending, setVerifiedPending] = useState(true);
+  useEffect(() => {
+    let active = true;
+    setVerifiedPending(true);
+    getVerifiedIpoDetail({ data: {
+      name: item.name, subscriptionStart: item.subscriptionStart,
+      offerPrice: item.offerPrice, brokers: item.brokers,
+    } })
+      .then(result => {
+        if (!active) return;
+        setVerifiedDetail(result);
+        const single = result.brokerTerms.length === 1 ? result.brokerTerms[0] : null;
+        if (single?.termsVerified && single.minimumShares !== null)
+          setShares(String(single.minimumShares));
+        if (single?.termsVerified && single.depositPercent !== null)
+          setPercent(String(single.depositPercent));
+      })
+      .catch(() => { /* Failure leaves unavailable information unverified. */ })
+      .finally(() => { if (active) setVerifiedPending(false); });
+    return () => { active = false; };
+  }, [item.name, item.subscriptionStart, item.offerPrice, item.brokers.join("|")]);
   useEffect(() => {
     if (!item.sourceUrl.startsWith("https://www.38.co.kr/")) return;
     let active = true;
@@ -285,10 +309,23 @@ function IpoDetails({ item }: { item: IpoItem }) {
       .finally(() => { if (active) setTermsPending(false); });
     return () => { active = false; };
   }, [item.name, item.sourceUrl]);
-  const minimumShares = item.minimumShares ?? terms?.minimumShares ?? null;
-  const depositPercent = item.depositPercent ?? terms?.depositPercent ?? null;
-  const actualMinimum = minimumShares !== null && depositPercent !== null && item.offerPrice !== null
-    ? Math.ceil(item.offerPrice * minimumShares * depositPercent / 100) : null;
+  const verifiedSingle = verifiedDetail?.brokerTerms.length === 1
+    ? verifiedDetail.brokerTerms[0] : null;
+  const legacySingle = item.brokers.length === 1 ? terms : null;
+  const minimumShares = verifiedSingle?.minimumShares ?? (
+    item.brokers.length === 1 ? (item.minimumShares ?? legacySingle?.minimumShares ?? null) : null
+  );
+  const depositPercent = verifiedSingle?.depositPercent ?? (
+    item.brokers.length === 1 ? (item.depositPercent ?? legacySingle?.depositPercent ?? null) : null
+  );
+  const actualMinimum = verifiedSingle?.termsVerified && verifiedSingle.minimumDeposit !== null
+    ? verifiedSingle.minimumDeposit
+    : minimumShares !== null && depositPercent !== null && item.offerPrice !== null
+      ? Math.ceil(item.offerPrice * minimumShares * depositPercent / 100) : null;
+  const onlineFee = verifiedSingle?.onlineFee ?? null;
+  const totalReady = actualMinimum !== null && onlineFee !== null
+    ? actualMinimum + onlineFee : null;
+  const detailLoading = termsPending || verifiedPending;
   const amount = item.offerPrice !== null &&
     Number(shares) > 0 && Number.isInteger(Number(shares)) && Number(shares) <= 10000000 &&
     Number(percent) > 0 && Number(percent) <= 100
@@ -300,18 +337,34 @@ function IpoDetails({ item }: { item: IpoItem }) {
         <Info label="청약 기간" value={formatDate(item.subscriptionStart) + " ~ " + formatDate(item.subscriptionEnd)} />
         <Info label="확정 공모가" value={money(item.offerPrice)} />
         {item.indicativePriceRange ? <Info label="희망 공모가 범위" value={item.indicativePriceRange} /> : null}
-        <Info label="환불·납입일" value={formatDate(item.refundDate || terms?.refundDate || "")} />
-        <Info label="상장 예정일" value={formatDate(item.listingDate || terms?.listingDate || "")} />
+        <Info label="환불일" value={formatDate(verifiedDetail?.refundDate || item.refundDate || terms?.refundDate || "")} />
+        <Info label="상장 예정일" value={formatDate(verifiedDetail?.listingDate || item.listingDate || terms?.listingDate || "")} />
         <Info label="최소 청약주수" value={minimumShares === null
-          ? termsPending ? "조건 확인 중" : "증권사별 확인 필요"
-          : minimumShares + "주 (참고)"} />
+          ? detailLoading ? "조건 확인 중" : "주관사별 미확인"
+          : minimumShares + "주"} />
         <Info label="청약 증거금률" value={depositPercent === null
-          ? "증권사별 확인 필요" : depositPercent + "% (참고)"} />
-        <Info label="최소 필요 증거금" value={actualMinimum !== null
-          ? money(actualMinimum) + " (참고)"
-          : termsPending ? "조건 확인 중" : "증권사별 확인 필요"} />
-        <Info label="청약 수수료" value="증권사별 확인 필요" />
+          ? detailLoading ? "확인 중" : "주관사별 미확인" : depositPercent + "%"} />
+        <Info label="최소 증거금" value={actualMinimum !== null
+          ? money(actualMinimum)
+          : detailLoading ? "확인 중" : "주관사별 미확인"} />
+        <Info label="온라인 청약 수수료 (일반)" value={onlineFee !== null
+          ? money(onlineFee) : detailLoading ? "확인 중" : "주관사별 미확인"} />
+        <Info label="준비 금액 (일반 기준)" value={totalReady === null
+          ? "확인 필요" : money(totalReady) + " (참고)"} />
       </div>
+      {verifiedDetail?.brokerTerms.some(x => x.onlineFee !== null) ? (
+        <div className="mt-2 rounded-lg border border-line bg-card px-3 py-2 text-xs leading-relaxed text-muted">
+          {verifiedDetail.brokerTerms.map(row => (
+            <p key={row.broker}>
+              {row.broker}: {row.onlineFee === null ? "수수료 미확인" : "일반 온라인 " + money(row.onlineFee)}
+              {row.onlineFeeNote ? " · " + row.onlineFeeNote : ""}
+              {row.feeSourceUrl ? (
+                <> · <a href={row.feeSourceUrl} target="_blank" rel="noopener noreferrer" className="underline">증권사 공식 수수료표</a></>
+              ) : null}
+            </p>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-3 rounded-xl border border-line bg-card px-3 py-3">
         <p className="text-xs font-semibold">청약 증거금 계산 <span className="font-normal text-muted">· 참고 계산, 수수료 제외</span></p>
         <div className="mt-2 grid grid-cols-2 gap-2">
@@ -336,6 +389,17 @@ function IpoDetails({ item }: { item: IpoItem }) {
       <p className="mt-3 text-xs leading-relaxed text-muted">
         주관사: {item.brokers.join(", ")} · {item.market || "시장 확인 필요"} · 자료: {item.sourceLabel}
       </p>
+      {verifiedDetail?.sourceUrl ? (
+        <p className="mt-1 text-xs text-muted">
+          최소 청약·환불일 참고: <a href={verifiedDetail.sourceUrl} target="_blank"
+          rel="noopener noreferrer" className="underline">{verifiedDetail.sourceLabel}</a>
+          {verifiedDetail.note ? " · " + verifiedDetail.note : ""}
+        </p>
+      ) : (
+        <p className="mt-1 text-xs text-muted">
+          {verifiedPending ? "공모주 상세 자료 확인 중…" : "종목별 세부 청약조건을 자동 검증하지 못했습니다. 주관사 공고를 확인하세요."}
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap gap-1.5">
         {item.brokers.map((name) => BROKER_SITES[name] ? (
           <a key={name} href={BROKER_SITES[name]} target="_blank" rel="noopener noreferrer"
