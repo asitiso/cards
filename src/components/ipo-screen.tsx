@@ -299,8 +299,8 @@ function IpoDetails({ item }: { item: IpoItem }) {
       <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
         <Info label="청약 기간" value={formatDate(item.subscriptionStart) + " ~ " + formatDate(item.subscriptionEnd)} />
         <Info label="확정 공모가" value={money(item.offerPrice)} />
-        <Info label="환불·납입일" value={formatDate(item.refundDate)} />
-        <Info label="상장 예정일" value={formatDate(item.listingDate)} />
+        <Info label="환불·납입일" value={formatDate(item.refundDate || terms?.refundDate || "")} />
+        <Info label="상장 예정일" value={formatDate(item.listingDate || terms?.listingDate || "")} />
         <Info label="최소 청약주수" value={minimumShares === null
           ? termsPending ? "조건 확인 중" : "증권사별 확인 필요"
           : minimumShares + "주 (참고)"} />
