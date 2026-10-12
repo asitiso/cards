@@ -89,7 +89,7 @@ export function parseSonnimIpos(html: string, today: string): IpoItem[] {
     const isUpcoming = /청약\s*예정/.test(section);
 
     for (const row of table[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
-      const rawCells = [...row[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m => m[1]);
+      const rawCells = [...row[1].matchAll(/<(td|th)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map(m => m[2]);
       const cells = rawCells.map(x => stripTags(x).replace(/\s+/g, " ").trim());
       if (cells.length !== 7 && cells.length !== 8) continue;
       const approximate = cells[1].match(/(?:20\d{2}[.\/-])?(\d{1,2})[.\/-]\d{1,2}\s*[~～–-]/);
