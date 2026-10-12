@@ -337,8 +337,8 @@ function IpoDetails({ item }: { item: IpoItem }) {
         <Info label="청약 기간" value={formatDate(item.subscriptionStart) + " ~ " + formatDate(item.subscriptionEnd)} />
         <Info label="확정 공모가" value={money(item.offerPrice)} />
         {item.indicativePriceRange ? <Info label="희망 공모가 범위" value={item.indicativePriceRange} /> : null}
-        <Info label="환불일" value={formatDate(verifiedDetail?.refundDate || item.refundDate || terms?.refundDate || "")} />
-        <Info label="상장 예정일" value={formatDate(verifiedDetail?.listingDate || item.listingDate || terms?.listingDate || "")} />
+        <Info label="환불일" value={formatDate(item.refundDate || verifiedDetail?.refundDate || terms?.refundDate || "")} />
+        <Info label="상장 예정일" value={formatDate(item.listingDate || verifiedDetail?.listingDate || terms?.listingDate || "")} />
         <Info label="최소 청약주수" value={minimumShares === null
           ? detailLoading ? "조건 확인 중" : "주관사별 미확인"
           : minimumShares + "주"} />
@@ -383,7 +383,9 @@ function IpoDetails({ item }: { item: IpoItem }) {
           계산 예시 {money(amount)}
         </p>
         <p className="mt-1 text-xs leading-relaxed text-muted">{minimumShares !== null || depositPercent !== null
-          ? "38커뮤니케이션 상세표에서 확인된 조건을 입력했습니다. 최종 적용 조건은 주관사 공식 공고에서 확인하세요."
+          ? verifiedSingle?.termsVerified
+            ? "종목별 공개 상세에서 최소 청약조건을 확인하고 증거금 계산을 교차 검증했습니다. 주관사 최종 공고가 우선합니다."
+            : "참고 공모주 상세표에 나온 조건입니다. 최종 적용 조건은 주관사 공식 공고에서 확인하세요."
           : "기본 입력값 10주·50%는 단순 계산 예시이며 확정 최소금액이 아닙니다."} 계좌 개설 시한·우대 청약한도·수수료는 증권사별 확인이 필요합니다.</p>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-muted">
