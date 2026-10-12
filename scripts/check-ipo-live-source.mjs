@@ -17,6 +17,24 @@ const parsed = parseSonnimIpos(html, today);
 const lastMonth = new Date(Date.parse(today + "T00:00:00+09:00") - 21 * 86400000)
   .toISOString().slice(0, 10);
 const current = parsed.filter(item => item.subscriptionEnd >= lastMonth);
+
+if (!parsed.length) {
+  const rows = [...html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)];
+  console.log("DEBUG current HTML structure", JSON.stringify({
+    namePresent: html.includes("엠에스바이오"),
+    firstTableRows: rows.slice(0, 8).map(r => ({
+      cells: [...r[1].matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map(m =>
+        m[1].replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0, 90)),
+      rowSnippet: r[1].replace(/\s+/g, " ").slice(0, 270),
+    })),
+    aroundName: (() => {
+      const offset = html.indexOf("엠에스바이오");
+      return offset < 0 ? "" : html.slice(offset - 550, offset + 850);
+    })(),
+    firstHeading: [...html.matchAll(/<h[23]\b[^>]*>([\s\S]*?)<\/h[23]>/gi)]
+      .slice(0, 7).map(m => m[1].replace(/<[^>]+>/g," ").trim()),
+  }, null, 2));
+}
 console.log(JSON.stringify({
   today, http: response.status, bytes: html.length,
   tableCount: (html.match(/<table\b/gi) || []).length,
