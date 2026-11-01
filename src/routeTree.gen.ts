@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiCronCollectRouteImport } from './routes/api/cron/collect'
 import { Route as ApiCronCollectEveningRouteImport } from './routes/api/cron/collect-evening'
+import { Route as ApiCronCollectIpoMorningRouteImport } from './routes/api/cron/collect-ipo-morning'
+import { Route as ApiCronCollectIpoEveningRouteImport } from './routes/api/cron/collect-ipo-evening'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -30,34 +32,53 @@ const ApiCronCollectEveningRoute = ApiCronCollectEveningRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 
+const ApiCronCollectIpoMorningRoute = ApiCronCollectIpoMorningRouteImport.update({
+  id: '/api/cron/collect-ipo-morning',
+  path: '/api/cron/collect-ipo-morning',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCronCollectIpoEveningRoute = ApiCronCollectIpoEveningRouteImport.update({
+  id: '/api/cron/collect-ipo-evening',
+  path: '/api/cron/collect-ipo-evening',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/cron/collect': typeof ApiCronCollectRoute
   '/api/cron/collect-evening': typeof ApiCronCollectEveningRoute
+  '/api/cron/collect-ipo-morning': typeof ApiCronCollectIpoMorningRoute
+  '/api/cron/collect-ipo-evening': typeof ApiCronCollectIpoEveningRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/cron/collect': typeof ApiCronCollectRoute
   '/api/cron/collect-evening': typeof ApiCronCollectEveningRoute
+  '/api/cron/collect-ipo-morning': typeof ApiCronCollectIpoMorningRoute
+  '/api/cron/collect-ipo-evening': typeof ApiCronCollectIpoEveningRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/cron/collect': typeof ApiCronCollectRoute
   '/api/cron/collect-evening': typeof ApiCronCollectEveningRoute
+  '/api/cron/collect-ipo-morning': typeof ApiCronCollectIpoMorningRoute
+  '/api/cron/collect-ipo-evening': typeof ApiCronCollectIpoEveningRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/cron/collect' | '/api/cron/collect-evening'
+  fullPaths: '/' | '/api/cron/collect' | '/api/cron/collect-evening' | '/api/cron/collect-ipo-morning' | '/api/cron/collect-ipo-evening'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/cron/collect' | '/api/cron/collect-evening'
-  id: '__root__' | '/' | '/api/cron/collect' | '/api/cron/collect-evening'
+  to: '/' | '/api/cron/collect' | '/api/cron/collect-evening' | '/api/cron/collect-ipo-morning' | '/api/cron/collect-ipo-evening'
+  id: '__root__' | '/' | '/api/cron/collect' | '/api/cron/collect-evening' | '/api/cron/collect-ipo-morning' | '/api/cron/collect-ipo-evening'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiCronCollectRoute: typeof ApiCronCollectRoute
   ApiCronCollectEveningRoute: typeof ApiCronCollectEveningRoute
+  ApiCronCollectIpoMorningRoute: typeof ApiCronCollectIpoMorningRoute
+  ApiCronCollectIpoEveningRoute: typeof ApiCronCollectIpoEveningRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -83,6 +104,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronCollectEveningRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/collect-ipo-morning': {
+      id: '/api/cron/collect-ipo-morning'
+      path: '/api/cron/collect-ipo-morning'
+      fullPath: '/api/cron/collect-ipo-morning'
+      preLoaderRoute: typeof ApiCronCollectIpoMorningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/cron/collect-ipo-evening': {
+      id: '/api/cron/collect-ipo-evening'
+      path: '/api/cron/collect-ipo-evening'
+      fullPath: '/api/cron/collect-ipo-evening'
+      preLoaderRoute: typeof ApiCronCollectIpoEveningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -90,6 +125,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiCronCollectRoute: ApiCronCollectRoute,
   ApiCronCollectEveningRoute: ApiCronCollectEveningRoute,
+  ApiCronCollectIpoMorningRoute: ApiCronCollectIpoMorningRoute,
+  ApiCronCollectIpoEveningRoute: ApiCronCollectIpoEveningRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
