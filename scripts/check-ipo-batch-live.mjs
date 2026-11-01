@@ -1,5 +1,13 @@
 import { fetchIpoDetailsBatch } from "../src/lib/ipo/verified-detail.server.ts";
 
+// These fixtures describe the 2026-10-12 subscription. After that event
+// disappears from the current index, keep unit regression tests as the
+// source of truth instead of making unrelated builds fail on old listings.
+if (Date.now() > Date.parse("2026-10-27T00:00:00+09:00")) {
+  console.log("SKIP: 2026-10-12 historical IPO no longer required in current public index");
+  process.exit(0);
+}
+
 const targets = [
   { id: "엠에스바이오|2026-10-12", name: "엠에스바이오",
     subscriptionStart: "2026-10-12", offerPrice: 7800, brokers: ["KB증권"] },
