@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { refreshBoard } from "@/lib/events/store.server";
 import { refreshPharma } from "@/lib/pharma/store.server";
 
-/** 10:00 Asia/Seoul = 01:00 UTC. Vercel Cron calls this once a day. */
+/** 08:00 Asia/Seoul = 23:00 UTC on the previous calendar day. */
 export const Route = createFileRoute("/api/cron/collect")({
   server: {
     handlers: {
