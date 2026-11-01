@@ -6,6 +6,9 @@ on:
       - 'src/lib/ipo/**'
       - 'src/components/ipo-screen.tsx'
       - 'src/routes/index.tsx'
+      - 'src/routes/api/cron/**'
+      - 'vercel.json'
+      - 'scripts/finance-collect-schedule.test.mjs'
       - 'src/lib/change-history/**'
       - 'package.json'
       - '.github/workflows/financial-collector.yml'
@@ -24,6 +27,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - run: node --test scripts/finance-collect-schedule.test.mjs
       - run: node --experimental-strip-types scripts/check-ipo-live-source.mjs
       - run: node --experimental-strip-types scripts/check-ipo-verified-detail.mjs
       - run: node --experimental-strip-types scripts/check-ipo-batch-live.mjs
