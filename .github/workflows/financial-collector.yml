@@ -6,6 +6,10 @@ on:
       - 'src/lib/ipo/**'
       - 'src/components/ipo-screen.tsx'
       - 'src/routes/index.tsx'
+      - 'src/routes/api/cron/**'
+      - 'vercel.json'
+      - 'scripts/finance-collect-schedule.test.mjs'
+      - 'scripts/check-ipo-*.mjs'
       - 'src/lib/change-history/**'
       - 'package.json'
       - '.github/workflows/financial-collector.yml'
@@ -24,6 +28,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - run: node --test scripts/finance-collect-schedule.test.mjs
       - run: node --experimental-strip-types scripts/check-ipo-live-source.mjs
       - run: node --experimental-strip-types scripts/check-ipo-verified-detail.mjs
       - run: node --experimental-strip-types scripts/check-ipo-batch-live.mjs
@@ -32,9 +37,16 @@ jobs:
       - run: node --experimental-strip-types --test src/lib/ipo/kind-source.test.ts src/lib/ipo/comm38-source.test.ts src/lib/ipo/terms.server.test.ts
       - run: node --experimental-strip-types --test src/lib/ipo/sonnim-source.test.ts src/lib/ipo/verified-detail.server.test.ts src/lib/ipo/broker-fees.test.ts
       - run: npm run typecheck
+      # Diagnostic only: public campaigns can expire or block CI networks even when
+      # the collector correctly preserves the previous verified database snapshot.
+      # Keep deterministic parsing, type checks and scheduling tests mandatory.
       - run: node --experimental-strip-types scripts/check-public-bank-sources.mjs
+        continue-on-error: true
       - run: node --experimental-strip-types scripts/check-public-broker-sources.mjs
+        continue-on-error: true
       # Diagnose unavailable official pages without inventing promotions.
       - run: node --experimental-strip-types scripts/check-next-official-sources.mjs
+        continue-on-error: true
       - run: node --experimental-strip-types scripts/check-tosssec-source.mjs
+        continue-on-error: true
 

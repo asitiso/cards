@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiCronCollectRouteImport } from './routes/api/cron/collect'
+import { Route as ApiCronCollectEveningRouteImport } from './routes/api/cron/collect-evening'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -23,30 +24,40 @@ const ApiCronCollectRoute = ApiCronCollectRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 
+const ApiCronCollectEveningRoute = ApiCronCollectEveningRouteImport.update({
+  id: '/api/cron/collect-evening',
+  path: '/api/cron/collect-evening',
+  getParentRoute: () => rootRouteImport,
+} as any)
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/cron/collect': typeof ApiCronCollectRoute
+  '/api/cron/collect-evening': typeof ApiCronCollectEveningRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/cron/collect': typeof ApiCronCollectRoute
+  '/api/cron/collect-evening': typeof ApiCronCollectEveningRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/cron/collect': typeof ApiCronCollectRoute
+  '/api/cron/collect-evening': typeof ApiCronCollectEveningRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/cron/collect'
+  fullPaths: '/' | '/api/cron/collect' | '/api/cron/collect-evening'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/cron/collect'
-  id: '__root__' | '/' | '/api/cron/collect'
+  to: '/' | '/api/cron/collect' | '/api/cron/collect-evening'
+  id: '__root__' | '/' | '/api/cron/collect' | '/api/cron/collect-evening'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiCronCollectRoute: typeof ApiCronCollectRoute
+  ApiCronCollectEveningRoute: typeof ApiCronCollectEveningRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +76,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCronCollectRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/collect-evening': {
+      id: '/api/cron/collect-evening'
+      path: '/api/cron/collect-evening'
+      fullPath: '/api/cron/collect-evening'
+      preLoaderRoute: typeof ApiCronCollectEveningRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiCronCollectRoute: ApiCronCollectRoute,
+  ApiCronCollectEveningRoute: ApiCronCollectEveningRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

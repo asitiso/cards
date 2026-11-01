@@ -74,13 +74,13 @@ async function collectShinhan(today: string): Promise<CollectHit> {
       }))
       .filter((row) => isOngoing(row.end, today) && row.start <= today)
       .sort((a, b) => a.end.localeCompare(b.end))
-      .slice(0, 28);
+      .slice(0, 64);
 
     const events = (
-      await mapPool(open, 5, async (row) => {
+      await mapPool(open, 8, async (row) => {
         const applyUrl = new URL(row.item.hpgEvtDlPgeUrlAr, "https://www.shinhancard.com").href;
         try {
-          const html = await fetchText(applyUrl);
+          const html = await fetchText(applyUrl, {}, 8000);
           const summaryRaw = stripTags(
             html.match(/class="evt-visual__summary"\s*>([\s\S]*?)<\/div>/)?.[1] ?? "",
           );
@@ -337,7 +337,7 @@ async function collectSamsung(today: string): Promise<CollectHit> {
   const issuer = "samsung" as const;
   const referer = "https://www.samsungcard.com/personal/event/ing/UHPPBE1401M0.jsp";
   try {
-    const pages = await mapPool([0, 1, 2], 3, async (pageNo) => {
+    const pages = await mapPool([0, 1, 2, 3, 4], 5, async (pageNo) => {
       const data = (await samsungService(
         "SHPPBE1401S02",
         { cmpId: "M171028654", query: "", cmpCtgId: "100", pgeNo: pageNo, enddtAdvtYn: 0, onGoing: "1" },
@@ -353,9 +353,9 @@ async function collectSamsung(today: string): Promise<CollectHit> {
       if (!item.cmsId || !end || !title || start > today) continue;
       seen.set(String(item.cmsId), { cmsId: String(item.cmsId), cmpId: item.cmpId || "", title, start, end });
     }
-    const chosen = rankSoon([...seen.values()], today, 18);
+    const chosen = rankSoon([...seen.values()], today, 36);
     const events = (
-      await mapPool(chosen, 5, async (card) => {
+      await mapPool(chosen, 7, async (card) => {
         try {
           const detail = (await samsungService(
             "SHPPBE1403S00",
@@ -418,7 +418,7 @@ async function collectLotte(today: string): Promise<CollectHit> {
   const issuer = "lotte" as const;
   const listUrl = "https://www.lottecard.co.kr/app/LPBNFDA_V100.lc";
   try {
-    const pages = await mapPool([1, 2, 3], 3, async (pageNo) => {
+    const pages = await mapPool([1, 2, 3, 4, 5], 5, async (pageNo) => {
       const raw = await fetchText("https://www.lottecard.co.kr/app/LPBNFDA_A100.lc", {
         method: "POST",
         headers: {
@@ -444,7 +444,7 @@ async function collectLotte(today: string): Promise<CollectHit> {
       });
     });
     const unique = [...new Map(pages.flat().filter((row) => row && row.start <= today).map((row) => [row!.id, row!])).values()];
-    const chosen = rankSoon(unique, today, 14);
+    const chosen = rankSoon(unique, today, 28);
     const events = (
       await mapPool(chosen, 4, async (card) => {
         const applyUrl = `https://www.lottecard.co.kr/app/LPBNFDA_V300.lc?evnBultSeq=${card.id}&evnCtgSeq=9999&bigTabGubun=2`;
@@ -665,7 +665,7 @@ async function collectBc(today: string): Promise<CollectHit> {
         return { id: item.pybcUnifEvntNo, title, start, end, typed: typed || tagged };
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
-    const chosen = rankSoon(cards, today, 16);
+    const chosen = rankSoon(cards, today, 32);
     const events = (
       await mapPool(chosen, 4, async (card) => {
         const applyUrl = `https://web.paybooc.co.kr/web/evnt/evnt-dts?pybcUnifEvntNo=${card.id}`;
@@ -777,7 +777,7 @@ async function collectIbk(today: string): Promise<CollectHit> {
       return { id: match[1], title, start: range.start, end: range.end };
     }).filter((row): row is NonNullable<typeof row> => row !== null);
     const unique = [...new Map(cards.map((card) => [card.id, card])).values()];
-    const chosen = rankSoon(unique, today, 10);
+    const chosen = rankSoon(unique, today, 20);
     const events = (
       await mapPool(chosen, 4, async (card) => {
         const applyUrl = `https://www.ibk.co.kr/event/ingDetailEvent.ibk?evnt_srno=${card.id}&evnt_dscd=H&pageId=CM01060100`;

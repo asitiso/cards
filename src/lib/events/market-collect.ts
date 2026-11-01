@@ -154,7 +154,7 @@ async function collectMirae(today: string): Promise<CollectHit> {
   const listUrl = issuerMeta(issuer).listUrl;
   try {
     const pages = await Promise.all(
-      [1, 2].map((page) => fetchText(`${listUrl}?currentPage=${page}`, {}, 8000).catch(() => "")),
+      [1, 2, 3, 4, 5, 6].map((page) => fetchText(`${listUrl}?currentPage=${page}`, {}, 8000).catch(() => "")),
     );
     const seen = new Set<string>();
     const rows: { id: string; title: string; start: string; end: string }[] = [];
@@ -206,57 +206,75 @@ async function collectSamsungSec(today: string): Promise<CollectHit> {
   const issuer = "samsungsec" as const;
   const listUrl = issuerMeta(issuer).listUrl;
   try {
-    const raw = await fetchText(
-      "https://www.samsungpop.com/mbw/customer/noticeEvent.do",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "X-Requested-With": "XMLHttpRequest",
-          Referer: listUrl,
+    // Public JSON is paginated; page one alone silently dropped later events.
+    const rawPages = await mapPool([1, 2, 3, 4, 5], 3, (pageNo) =>
+      fetchText(
+        "https://www.samsungpop.com/mbw/customer/noticeEvent.do",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Requested-With": "XMLHttpRequest",
+            Referer: listUrl,
+          },
+          body: "cmd=getEventList&currentPage=" + pageNo +
+            "&rowsPerPage=30&listRow=30&ntcSect=3&EtcConts4=Y&todayEnd=0",
         },
-        body: "cmd=getEventList&currentPage=1&rowsPerPage=30&listRow=30&ntcSect=3&EtcConts4=Y&todayEnd=0",
-      },
-      8000,
+        8000,
+      ).catch(() => ""),
     );
-    const parsed = JSON.parse(raw) as {
-      list?: { ntcTitle1?: string; EtcConts5?: string; period?: string; menuSeqNo?: string }[];
-    };
-    const rows = (parsed.list ?? [])
-      .map((item) => {
+    if (!rawPages[0]) throw new Error("첫 페이지 접근 실패");
+    const seen = new Map<string, {
+      id: string; title: string; blurb: string; start: string; end: string;
+    }>();
+    let pagesRead = 0;
+    for (const raw of rawPages) {
+      if (!raw) continue;
+      let parsed: { list?: {
+        ntcTitle1?: string; EtcConts5?: string; period?: string; menuSeqNo?: string;
+      }[] };
+      try {
+        parsed = JSON.parse(raw) as typeof parsed;
+      } catch {
+        continue;
+      }
+      if (!Array.isArray(parsed.list)) continue;
+      pagesRead++;
+      for (const item of parsed.list) {
         const range = dateRange(item.period ?? "");
         const title = (item.ntcTitle1 ?? "").replace(/\s+/g, " ").trim();
-        if (!item.menuSeqNo || !range || title.length < 4) return null;
-        if (!isOngoing(range.end, today) || range.start > today) return null;
-        return { id: item.menuSeqNo, title, blurb: item.EtcConts5 ?? "", start: range.start, end: range.end };
-      })
-      .filter((row): row is NonNullable<typeof row> => row !== null);
+        if (!item.menuSeqNo || !range || title.length < 4) continue;
+        if (!isOngoing(range.end, today) || range.start > today) continue;
+        seen.set(String(item.menuSeqNo), {
+          id: String(item.menuSeqNo), title, blurb: item.EtcConts5 ?? "",
+          start: range.start, end: range.end,
+        });
+      }
+    }
+    if (!pagesRead) throw new Error("공식 목록 데이터를 판독하지 못했습니다");
+    const rows = [...seen.values()];
     const events = (
-      await mapPool(rows, 4, (row) =>
+      await mapPool(rows, 5, (row) =>
         keepIfEntry(
-          issuer,
-          row.id,
-          row.title,
-          row.blurb,
-          row.start,
-          row.end,
-          `https://www.samsungpop.com/mbw/customer/noticeEvent.do?cmd=eventView&MenuSeqNo=${row.id}`,
+          issuer, row.id, row.title, row.blurb, row.start, row.end,
+          "https://www.samsungpop.com/mbw/customer/noticeEvent.do?cmd=eventView&MenuSeqNo=" + row.id,
         ),
       )
     ).filter((event): event is EntryEvent => event !== null);
     return {
       issuer,
-      ok: true,
-      message: events.length
-        ? `진행 ${rows.length}건 중 응모·쿠폰·추첨 ${events.length}건입니다.`
-        : `진행 ${rows.length}건을 읽었지만 응모·쿠폰·추첨은 없습니다.`,
+      ok: events.length > 0,
+      message: "공식 목록 " + pagesRead + "/5페이지에서 진행 중 " + rows.length +
+        "건, 확인 " + events.length + "건." +
+        (pagesRead < 5 ? " 일부 페이지 미확인, 기존 자료를 보존합니다." : ""),
       events,
     };
   } catch (error) {
     return {
       issuer,
       ok: false,
-      message: `삼성증권 목록을 열지 못했습니다. ${error instanceof Error ? error.message : ""}`.trim(),
+      message: "삼성증권 목록을 열지 못했습니다. " +
+        (error instanceof Error ? error.message : ""),
       events: [],
     };
   }

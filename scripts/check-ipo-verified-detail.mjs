@@ -1,5 +1,13 @@
 import { findIpoDetailUrl, parseVerifiedDetail } from "../src/lib/ipo/verified-detail.server.ts";
 
+// These fixtures describe the 2026-10-12 subscription. After that event
+// disappears from the current index, keep unit regression tests as the
+// source of truth instead of making unrelated builds fail on old listings.
+if (Date.now() > Date.parse("2026-10-27T00:00:00+09:00")) {
+  console.log("SKIP: 2026-10-12 historical IPO no longer required in current public index");
+  process.exit(0);
+}
+
 const fetchHtml = async (url) => {
   const reply = await fetch(url, { signal: AbortSignal.timeout(9000),
     headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/128 Safari/537.36",
