@@ -9,6 +9,7 @@ on:
       - 'src/routes/api/cron/**'
       - 'vercel.json'
       - 'scripts/finance-collect-schedule.test.mjs'
+      - 'scripts/check-ipo-*.mjs'
       - 'src/lib/change-history/**'
       - 'package.json'
       - '.github/workflows/financial-collector.yml'
