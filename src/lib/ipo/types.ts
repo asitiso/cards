@@ -14,6 +14,9 @@ export type IpoItem = {
   depositPercent: number | null;
   sourceUrl: string;
   sourceLabel: string;
+  /** Source reliability of the schedule, not a guarantee of broker-specific terms. */
+  sourceStatus?: "official" | "corroborated" | "reference" | "conflict";
+  verificationNote?: string;
 };
 
 export type IpoBoard = {

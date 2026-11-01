@@ -160,7 +160,7 @@ export function IpoScreen({
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <p className="min-w-0 truncate text-right text-[11px] tabular-nums leading-tight text-muted sm:text-xs">
-            조회 {new Intl.DateTimeFormat("ko-KR", {timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"}).format(new Date(board.collectedAt))}
+            최종 확인 {new Intl.DateTimeFormat("ko-KR", {timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"}).format(new Date(board.collectedAt))}
           </p>
           <button type="button" disabled={pending} onClick={() => void refresh()}
             className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-ink px-3 text-xs font-medium text-paper disabled:opacity-60">
@@ -299,6 +299,16 @@ function IpoRow({ item, today, prefetched, open, onToggle }: {
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-semibold">{item.name}</span>
             <span className="block truncate text-[11px] text-muted">{item.brokers.join(" · ")} · ~{formatDate(item.subscriptionEnd).slice(5)}</span>
+            {item.verificationNote ? (
+              <span className="block truncate text-[10px] text-amber-700" title={item.verificationNote}>
+                ⚠ 확인 필요 · {item.verificationNote}
+              </span>
+            ) : item.sourceStatus ? (
+              <span className="block text-[10px] text-muted">
+                {item.sourceStatus === "reference" ? "보조 자료 · 공식 확인 필요" :
+                  item.sourceStatus === "corroborated" ? "공식·보조 자료 대조" : "KRX KIND 기준"}
+              </span>
+            ) : null}
             {prefetched?.brokerTerms.length === 1 &&
             prefetched.brokerTerms[0].termsVerified &&
             prefetched.brokerTerms[0].minimumDeposit !== null ? (

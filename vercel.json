@@ -8,6 +8,14 @@
     {
       "path": "/api/cron/collect-evening",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron/collect-ipo-morning",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/collect-ipo-evening",
+      "schedule": "0 11 * * *"
     }
   ]
 }

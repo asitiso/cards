@@ -48,7 +48,9 @@ export function parse38Terms(html: string, expectedName: string): IpoTerms {
       ? minimumShares : null,
     depositPercent: depositPercent !== null && depositPercent >= 1 && depositPercent <= 100
       ? depositPercent : null,
-    verified: true,
+    verified: minimumShares !== null && depositPercent !== null &&
+      minimumShares >= 1 && minimumShares <= 100000 &&
+      depositPercent >= 1 && depositPercent <= 100,
     refundDate: detailDate("환불일"),
     listingDate: detailDate("상장일"),
   };

@@ -15,10 +15,17 @@ const brokerSource = readFileSync(
 const home = readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
 
 test("finance collection is scheduled at exactly 08:00 and 20:00 KST daily", () => {
-  assert.equal(vercel.crons.length, 2);
-  assert.deepEqual(vercel.crons, [
+  const financeCrons = vercel.crons.filter((job) =>
+    job.path === "/api/cron/collect" || job.path === "/api/cron/collect-evening");
+  assert.deepEqual(financeCrons, [
     { path: "/api/cron/collect", schedule: "0 23 * * *" },
     { path: "/api/cron/collect-evening", schedule: "0 11 * * *" },
+  ]);
+  // IPO collection runs independently; it must never extend homepage collection.
+  const ipoCrons = vercel.crons.filter((job) => job.path.includes("collect-ipo-"));
+  assert.deepEqual(ipoCrons, [
+    { path: "/api/cron/collect-ipo-morning", schedule: "0 23 * * *" },
+    { path: "/api/cron/collect-ipo-evening", schedule: "0 11 * * *" },
   ]);
   assert.match(cronRoute, /refreshBoard\(\)/);
   assert.match(cronRoute, /process\.env\.CRON_SECRET/);
