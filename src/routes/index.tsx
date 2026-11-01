@@ -431,7 +431,7 @@ function EventRow({
             href={eventWebDestination(event)}
             target="_blank"
             rel="noreferrer"
-            className="ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
+            className={`ml-auto inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full px-2 text-[11px] font-medium ${event.entry === false ? "border border-line bg-card text-muted" : "bg-accent text-accent-ink"}`}
           >
             {event.issuer === "woori" ? "바로가기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
@@ -485,7 +485,7 @@ function EventRow({
             href={eventWebDestination(event)}
             target="_blank"
             rel="noreferrer"
-            className="mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 text-[11px] font-medium text-accent-ink"
+            className={`mr-3 inline-flex h-6 shrink-0 items-center gap-0.5 rounded-full px-2 text-[11px] font-medium ${event.entry === false ? "border border-line bg-card text-muted" : "bg-accent text-accent-ink"}`}
           >
             {event.issuer === "woori" ? "바로가기" : event.entry === false ? "보기" : "응모"}
             <ArrowUpRight className="size-3" />
@@ -536,7 +536,7 @@ function EventBody({ event, id }: { event: EntryEvent; id: string }) {
         href={eventWebDestination(event)}
         target="_blank"
         rel="noreferrer"
-        className="mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full bg-accent px-4 text-sm font-medium text-accent-ink sm:w-auto"
+        className={`mt-2.5 inline-flex h-9 w-full items-center justify-center gap-1 rounded-full px-4 text-sm font-medium sm:w-auto ${event.entry === false ? "border border-line bg-card text-muted" : "bg-accent text-accent-ink"}`}
       >
         {event.issuer === "woori" ? "우리카드 모바일 이벤트 바로가기" : <>{issuerName(event.issuer)}에서 {event.entry === false ? "보기" : "응모"}</>}
         <ArrowUpRight className="size-4" />
@@ -602,7 +602,7 @@ function Deadline({ end, today }: { end: string; today: string }) {
     <span
       className={
         hot
-          ? "inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-medium tabular-nums text-accent-ink"
+          ? "inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-full bg-accent/15 px-1 text-[10px] font-medium tabular-nums text-ink"
           : "inline-flex h-5 w-12 shrink-0 items-center justify-center rounded-full bg-paper px-1 text-[10px] font-medium tabular-nums text-muted"
       }
     >
